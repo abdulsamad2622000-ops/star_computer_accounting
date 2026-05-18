@@ -91,15 +91,21 @@ Route::middleware('auth')->group(function () {
     });
 
     // ── Inventory ──────────────────────────────
-    Route::middleware('staff.permission:inventory_access')->group(function () {
-        Route::get('products/export/excel',
-            [ProductController::class, 'exportExcel'])
-            ->name('products.export.excel');
-        Route::get('products/export/pdf',
-            [ProductController::class, 'exportPdf'])
-            ->name('products.export.pdf');
-        Route::resource('products', ProductController::class);
-    });
+Route::middleware('staff.permission:inventory_access')->group(function () {
+    Route::get('products/export/excel',
+        [ProductController::class, 'exportExcel'])
+        ->name('products.export.excel');
+    Route::get('products/export/pdf',
+        [ProductController::class, 'exportPdf'])
+        ->name('products.export.pdf');
+
+    // ✅ YEH ADD KARO — resource se PEHLE
+    Route::get('products/search',
+        [ProductController::class, 'search'])
+        ->name('products.search');
+
+    Route::resource('products', ProductController::class);
+});
     Route::post('products/opening/store',
         [ProductController::class, 'openingStore'])
         ->name('products.opening.store')

@@ -37,38 +37,37 @@ class SaleController extends Controller
         ));
     }
 
- public function history(Request $request)
-{
-    $query = Sale::where('type', 'sale')
-        ->with(['customer', 'items.product', 'salesperson']);
+    public function history(Request $request)
+    {
+        $query = Sale::where('type', 'sale')
+            ->with(['customer', 'items.product', 'salesperson']);
 
-    // ✅ Sirf tab ALL dikhao jab explicitly all=1 aaye
-    if ($request->all == '1') {
-        // koi date filter nahi
-    } elseif ($request->from && $request->to) {
-        $query->whereBetween('date', [$request->from, $request->to]);
-    } elseif ($request->from) {
-        $query->whereDate('date', '>=', $request->from);
-    } elseif ($request->to) {
-        $query->whereDate('date', '<=', $request->to);
-    } elseif ($request->date) {
-        $query->whereDate('date', $request->date);
-    } else {
-        $query->whereDate('date', today()); // default today
+        if ($request->all == '1') {
+            // koi date filter nahi
+        } elseif ($request->from && $request->to) {
+            $query->whereBetween('date', [$request->from, $request->to]);
+        } elseif ($request->from) {
+            $query->whereDate('date', '>=', $request->from);
+        } elseif ($request->to) {
+            $query->whereDate('date', '<=', $request->to);
+        } elseif ($request->date) {
+            $query->whereDate('date', $request->date);
+        } else {
+            $query->whereDate('date', today());
+        }
+
+        if ($request->memo_no) {
+            $query->where('memo_no', 'like', '%'.$request->memo_no.'%');
+        }
+
+        if ($request->customer_name) {
+            $query->whereHas('customer', fn($q) =>
+                $q->where('name', 'like', '%'.$request->customer_name.'%')
+            );
+        }
+
+        return response()->json($query->latest()->get());
     }
-
-    if ($request->memo_no) {
-        $query->where('memo_no', 'like', '%'.$request->memo_no.'%');
-    }
-
-    if ($request->customer_name) {
-        $query->whereHas('customer', fn($q) =>
-            $q->where('name', 'like', '%'.$request->customer_name.'%')
-        );
-    }
-
-    return response()->json($query->latest()->get());
-}
 
     public function store(Request $request)
     {
@@ -249,56 +248,78 @@ class SaleController extends Controller
 
             foreach ($request->items as $item) {
 
+                $newQty   = (int)   $item['qty'];
+                $newPrice = (float) $item['purchase_price'];
+
                 if (!empty($item['stock_code'])) {
-                    // Stock code se dhundo
+                    // ── Stock code se dhundo ──────────────────────────
                     $existingProduct = Product::where('stock_code', $item['stock_code'])->first();
 
                     if ($existingProduct) {
-                        $existingProduct->increment('received_qty', $item['qty']);
-                        $existingProduct->increment('remaining_qty', $item['qty']);
+                        // ✅ Average price formula
+                        $oldQty   = $existingProduct->remaining_qty;
+                        $oldPrice = $existingProduct->purchase_price;
+
+                        $avgPrice = ($oldQty + $newQty) > 0
+                            ? (($oldQty * $oldPrice) + ($newQty * $newPrice)) / ($oldQty + $newQty)
+                            : $newPrice;
+
+                        $existingProduct->increment('received_qty', $newQty);
+                        $existingProduct->increment('remaining_qty', $newQty);
                         $existingProduct->update([
-                            'purchase_price' => $item['purchase_price'],
+                            'purchase_price' => round($avgPrice, 2),
                             'sale_price'     => $item['sale_price'],
                             'vendor_id'      => $request->vendor_id,
                         ]);
                         $product = $existingProduct;
+
                     } else {
                         $product = Product::create([
                             'stock_code'     => $item['stock_code'],
                             'name'           => $item['name'],
                             'vendor_id'      => $request->vendor_id,
-                            'purchase_price' => $item['purchase_price'],
+                            'purchase_price' => $newPrice,
                             'sale_price'     => $item['sale_price'],
-                            'received_qty'   => $item['qty'],
+                            'received_qty'   => $newQty,
                             'sold_qty'       => 0,
-                            'remaining_qty'  => $item['qty'],
+                            'remaining_qty'  => $newQty,
                             'alert_qty'      => $item['alert_qty'] ?? 5,
                             'is_active'      => true,
                         ]);
                     }
+
                 } else {
-                    // Sirf naam se dhundo — kisi bhi vendor ke saath
-                    $existingProduct = Product::where('name', $item['name'])->first();
+                    // ── Naam se dhundo ────────────────────────────────
+                    $existingProduct = Product::whereRaw('LOWER(name) = ?', [strtolower(trim($item['name']))])->first();
 
                     if ($existingProduct) {
-                        $existingProduct->increment('received_qty', $item['qty']);
-                        $existingProduct->increment('remaining_qty', $item['qty']);
+                        // ✅ Average price formula
+                        $oldQty   = $existingProduct->remaining_qty;
+                        $oldPrice = $existingProduct->purchase_price;
+
+                        $avgPrice = ($oldQty + $newQty) > 0
+                            ? (($oldQty * $oldPrice) + ($newQty * $newPrice)) / ($oldQty + $newQty)
+                            : $newPrice;
+
+                        $existingProduct->increment('received_qty', $newQty);
+                        $existingProduct->increment('remaining_qty', $newQty);
                         $existingProduct->update([
-                            'purchase_price' => $item['purchase_price'],
+                            'purchase_price' => round($avgPrice, 2),
                             'sale_price'     => $item['sale_price'],
                             'vendor_id'      => $request->vendor_id,
                         ]);
                         $product = $existingProduct;
+
                     } else {
                         $product = Product::create([
                             'stock_code'     => null,
-                            'name'           => $item['name'],
+                            'name'           => trim($item['name']),
                             'vendor_id'      => $request->vendor_id,
-                            'purchase_price' => $item['purchase_price'],
+                            'purchase_price' => $newPrice,
                             'sale_price'     => $item['sale_price'],
-                            'received_qty'   => $item['qty'],
+                            'received_qty'   => $newQty,
                             'sold_qty'       => 0,
-                            'remaining_qty'  => $item['qty'],
+                            'remaining_qty'  => $newQty,
                             'alert_qty'      => $item['alert_qty'] ?? 5,
                             'is_active'      => true,
                         ]);
@@ -309,9 +330,9 @@ class SaleController extends Controller
                     'sale_id'     => $purchase->id,
                     'product_id'  => $product->id,
                     'stock_code'  => $product->stock_code,
-                    'qty'         => $item['qty'],
-                    'rate'        => $item['purchase_price'],
-                    'total'       => $item['qty'] * $item['purchase_price'],
+                    'qty'         => $newQty,
+                    'rate'        => $newPrice,
+                    'total'       => $newQty * $newPrice,
                     'description' => $item['description'] ?? null,
                 ]);
             }
@@ -397,8 +418,19 @@ class SaleController extends Controller
                 $saleItem->update(['rate' => $item['purchase_price']]);
 
                 if ($saleItem->product) {
-                    $saleItem->product->update([
-                        'purchase_price' => $item['purchase_price'],
+                    // ✅ Average price calculate karo
+                    $product  = $saleItem->product;
+                    $oldQty   = $product->remaining_qty;
+                    $oldPrice = $product->purchase_price;
+                    $newQty   = $saleItem->qty;
+                    $newPrice = (float) $item['purchase_price'];
+
+                    $avgPrice = ($oldQty > 0)
+                        ? (($oldQty * $oldPrice) + ($newQty * $newPrice)) / ($oldQty + $newQty)
+                        : $newPrice;
+
+                    $product->update([
+                        'purchase_price' => round($avgPrice, 2),
                         'sale_price'     => $item['sale_price'],
                     ]);
                 }
@@ -420,297 +452,297 @@ class SaleController extends Controller
             'message' => 'Rates update ho gayi!'
         ]);
     }
+
     public function transferSale(Request $request, $saleId)
-{
-    $request->validate([
-        'new_customer_id' => 'required|exists:customers,id',
-    ]);
+    {
+        $request->validate([
+            'new_customer_id' => 'required|exists:customers,id',
+        ]);
 
-    $sale = \App\Models\Sale::findOrFail($saleId);
-    $oldCustomerId = $sale->customer_id;
-    $newCustomerId = $request->new_customer_id;
+        $sale          = \App\Models\Sale::findOrFail($saleId);
+        $oldCustomerId = $sale->customer_id;
+        $newCustomerId = $request->new_customer_id;
 
-    if ($oldCustomerId == $newCustomerId) {
+        if ($oldCustomerId == $newCustomerId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Same customer hai! Alag customer select karein.'
+            ]);
+        }
+
+        $oldCustomer = \App\Models\Customer::find($oldCustomerId);
+        $newCustomer = \App\Models\Customer::find($newCustomerId);
+
+        if ($oldCustomer && $sale->balance > 0) {
+            $oldCustomer->decrement('balance', $sale->balance);
+        }
+        if ($newCustomer && $sale->balance > 0) {
+            $newCustomer->increment('balance', $sale->balance);
+        }
+
+        $sale->update(['customer_id' => $newCustomerId]);
+
         return response()->json([
-            'success' => false,
-            'message' => 'Same customer hai! Alag customer select karein.'
+            'success' => true,
+            'message' => '✅ Bill transfer ho gaya!'
         ]);
     }
 
-    $oldCustomer = \App\Models\Customer::find($oldCustomerId);
-    $newCustomer = \App\Models\Customer::find($newCustomerId);
+    public function transferPurchase(Request $request, $saleId)
+    {
+        $request->validate([
+            'new_vendor_id' => 'required|exists:vendors,id',
+        ]);
 
-    // Old customer ki balance kam karo
-    if ($oldCustomer && $sale->balance > 0) {
-        $oldCustomer->decrement('balance', $sale->balance);
-    }
+        $purchase    = \App\Models\Sale::findOrFail($saleId);
+        $oldVendorId = $purchase->vendor_id;
+        $newVendorId = $request->new_vendor_id;
 
-    // New customer ki balance badha do
-    if ($newCustomer && $sale->balance > 0) {
-        $newCustomer->increment('balance', $sale->balance);
-    }
+        if ($oldVendorId == $newVendorId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Same vendor hai! Alag vendor select karein.'
+            ]);
+        }
 
-    // Sale ka customer update karo
-    $sale->update(['customer_id' => $newCustomerId]);
+        $oldVendor = \App\Models\Vendor::find($oldVendorId);
+        $newVendor = \App\Models\Vendor::find($newVendorId);
 
-    return response()->json([
-        'success' => true,
-        'message' => '✅ Bill transfer ho gaya!'
-    ]);
-}
-public function transferPurchase(Request $request, $saleId)
-{
-    $request->validate([
-        'new_vendor_id' => 'required|exists:vendors,id',
-    ]);
+        if ($oldVendor && $purchase->balance > 0) {
+            $oldVendor->decrement('balance', $purchase->balance);
+        }
+        if ($newVendor && $purchase->balance > 0) {
+            $newVendor->increment('balance', $purchase->balance);
+        }
 
-    $purchase    = \App\Models\Sale::findOrFail($saleId);
-    $oldVendorId = $purchase->vendor_id;
-    $newVendorId = $request->new_vendor_id;
+        $purchase->update(['vendor_id' => $newVendorId]);
 
-    if ($oldVendorId == $newVendorId) {
         return response()->json([
-            'success' => false,
-            'message' => 'Same vendor hai! Alag vendor select karein.'
+            'success' => true,
+            'message' => '✅ Purchase transfer ho gaya!'
         ]);
     }
 
-    $oldVendor = \App\Models\Vendor::find($oldVendorId);
-    $newVendor = \App\Models\Vendor::find($newVendorId);
+    public function updateSale(Request $request, $saleId)
+    {
+        $sale = \App\Models\Sale::with('items.product')->findOrFail($saleId);
 
-    // Old vendor ki balance kam karo
-    if ($oldVendor && $purchase->balance > 0) {
-        $oldVendor->decrement('balance', $purchase->balance);
-    }
-
-    // New vendor ki balance badha do
-    if ($newVendor && $purchase->balance > 0) {
-        $newVendor->increment('balance', $purchase->balance);
-    }
-
-    // Purchase ka vendor update karo
-    $purchase->update(['vendor_id' => $newVendorId]);
-
-    return response()->json([
-        'success' => true,
-        'message' => '✅ Purchase transfer ho gaya!'
-    ]);
-}
-
-public function updateSale(Request $request, $saleId)
-{
-    $sale = \App\Models\Sale::with('items.product')->findOrFail($saleId);
-
-    $request->validate([
-        'date'         => 'required|date',
-        'customer_id'  => 'required|exists:customers,id',
-        'payment_type' => 'required',
-        'items'        => 'required|array',
-    ]);
-
-    // ── Inventory reverse karo (old quantities)
-    foreach ($sale->items as $oldItem) {
-        if ($oldItem->product) {
-            $oldItem->product->increment('remaining_qty', $oldItem->qty);
-            $oldItem->product->decrement('sold_qty', $oldItem->qty);
-        }
-    }
-
-    // ── Old customer balance reverse karo
-    $oldCustomer = \App\Models\Customer::find($sale->customer_id);
-    if ($oldCustomer && $sale->balance > 0) {
-        $oldCustomer->decrement('balance', $sale->balance);
-    }
-
-    // ── Items recalculate karo
-    $total    = 0;
-    $discount = $request->discount ?? 0;
-    $paid     = $request->paid     ?? 0;
-
-    // Old items delete karo
-    $sale->items()->delete();
-
-    // New items save karo
-    foreach ($request->items as $item) {
-        if (empty($item['product_id']) || empty($item['qty'])) continue;
-
-        $product = \App\Models\Product::find($item['product_id']);
-        if (!$product) continue;
-
-        $qty  = (int)   $item['qty'];
-        $rate = (float) $item['rate'];
-        $amt  = $qty * $rate;
-        $total += $amt;
-
-        \App\Models\SaleItem::create([
-            'sale_id'     => $sale->id,
-            'product_id'  => $product->id,
-            'stock_code'  => $item['stock_code'] ?? $product->stock_code,
-            'qty'         => $qty,
-            'rate'        => $rate,
-            'total'       => $amt,
-            'description' => $item['description'] ?? null,
+        $request->validate([
+            'date'         => 'required|date',
+            'customer_id'  => 'required|exists:customers,id',
+            'payment_type' => 'required',
+            'items'        => 'required|array',
         ]);
 
-        // Inventory update karo
-        $product->decrement('remaining_qty', $qty);
-        $product->increment('sold_qty', $qty);
-    }
-
-    $netTotal = max($total - $discount, 0);
-    $balance  = max($netTotal - $paid, 0);
-
-    // ── Sale update karo
-    $sale->update([
-        'customer_id'  => $request->customer_id,
-        'date'         => $request->date,
-        'total'        => $netTotal,
-        'discount'     => $discount,
-        'paid'         => $paid,
-        'balance'      => $balance,
-        'payment_type' => $request->payment_type,
-    ]);
-
-    // ── New customer balance update karo
-    $newCustomer = \App\Models\Customer::find($request->customer_id);
-    if ($newCustomer && $balance > 0) {
-        $newCustomer->increment('balance', $balance);
-    }
-
-    return response()->json([
-        'success' => true,
-        'message' => '✅ Sale update ho gaya!'
-    ]);
-}
-
-public function editData($saleId)
-{
-    $sale = \App\Models\Sale::with('items.product')->findOrFail($saleId);
-
-    return response()->json([
-        'success' => true,
-        'sale'    => [
-            'id'           => $sale->id,
-            'date'         => $sale->date,
-            'customer_id'  => $sale->customer_id,
-            'payment_type' => $sale->payment_type,
-            'discount'     => $sale->discount,
-            'paid'         => $sale->paid,
-            'balance'      => $sale->balance,
-            'items'        => $sale->items->map(fn($item) => [
-                'id'          => $item->id,
-                'product_id'  => $item->product_id,
-                'stock_code'  => $item->stock_code,
-                'qty'         => $item->qty,
-                'rate'        => $item->rate,
-                'total'       => $item->total,
-                'description' => $item->description,
-            ])
-        ]
-    ]);
-}
-public function editPurchaseData($saleId)
-{
-    $sale = \App\Models\Sale::with('items.product')->findOrFail($saleId);
-
-    return response()->json([
-        'success' => true,
-        'sale'    => [
-            'id'           => $sale->id,
-            'date'         => $sale->date,
-            'vendor_id'    => $sale->vendor_id,
-            'payment_type' => $sale->payment_type,
-            'discount'     => $sale->discount,
-            'paid'         => $sale->paid,
-            'balance'      => $sale->balance,
-            'items'        => $sale->items->map(fn($item) => [
-                'id'          => $item->id,
-                'product_id'  => $item->product_id,
-                'stock_code'  => $item->stock_code,
-                'qty'         => $item->qty,
-                'rate'        => $item->rate,
-                'total'       => $item->total,
-                'description' => $item->description,
-            ])
-        ]
-    ]);
-}
-
-public function updatePurchase(Request $request, $saleId)
-{
-    $sale = \App\Models\Sale::with('items.product')->findOrFail($saleId);
-
-    // Inventory reverse karo
-    foreach ($sale->items as $oldItem) {
-        if ($oldItem->product) {
-            $oldItem->product->increment('remaining_qty', $oldItem->qty);
-            $oldItem->product->decrement('received_qty', $oldItem->qty);
+        // Inventory reverse karo (old quantities)
+        foreach ($sale->items as $oldItem) {
+            if ($oldItem->product) {
+                $oldItem->product->increment('remaining_qty', $oldItem->qty);
+                $oldItem->product->decrement('sold_qty', $oldItem->qty);
+            }
         }
-    }
 
-    // Old vendor balance reverse karo
-    $oldVendor = \App\Models\Vendor::find($sale->vendor_id);
-    if ($oldVendor && $sale->balance > 0) {
-        $oldVendor->decrement('balance', $sale->balance);
-    }
+        // Old customer balance reverse karo
+        $oldCustomer = \App\Models\Customer::find($sale->customer_id);
+        if ($oldCustomer && $sale->balance > 0) {
+            $oldCustomer->decrement('balance', $sale->balance);
+        }
 
-    $total    = 0;
-    $discount = $request->discount ?? 0;
-    $paid     = $request->paid     ?? 0;
+        $total    = 0;
+        $discount = $request->discount ?? 0;
+        $paid     = $request->paid     ?? 0;
 
-    $sale->items()->delete();
+        $sale->items()->delete();
 
-    foreach ($request->items as $item) {
-        if (empty($item['product_id']) || empty($item['qty'])) continue;
+        foreach ($request->items as $item) {
+            if (empty($item['product_id']) || empty($item['qty'])) continue;
 
-        $product = \App\Models\Product::find($item['product_id']);
-        if (!$product) continue;
+            $product = \App\Models\Product::find($item['product_id']);
+            if (!$product) continue;
 
-        $qty  = (int)   $item['qty'];
-        $rate = (float) $item['rate'];
-        $amt  = $qty * $rate;
-        $total += $amt;
+            $qty  = (int)   $item['qty'];
+            $rate = (float) $item['rate'];
+            $amt  = $qty * $rate;
+            $total += $amt;
 
-        \App\Models\SaleItem::create([
-            'sale_id'     => $sale->id,
-            'product_id'  => $product->id,
-            'stock_code'  => $item['stock_code'] ?? $product->stock_code,
-            'qty'         => $qty,
-            'rate'        => $rate,
-            'total'       => $amt,
-            'description' => $item['description'] ?? null,
+            \App\Models\SaleItem::create([
+                'sale_id'     => $sale->id,
+                'product_id'  => $product->id,
+                'stock_code'  => $item['stock_code'] ?? $product->stock_code,
+                'qty'         => $qty,
+                'rate'        => $rate,
+                'total'       => $amt,
+                'description' => $item['description'] ?? null,
+            ]);
+
+            $product->decrement('remaining_qty', $qty);
+            $product->increment('sold_qty', $qty);
+        }
+
+        $netTotal = max($total - $discount, 0);
+        $balance  = max($netTotal - $paid, 0);
+
+        $sale->update([
+            'customer_id'  => $request->customer_id,
+            'date'         => $request->date,
+            'total'        => $netTotal,
+            'discount'     => $discount,
+            'paid'         => $paid,
+            'balance'      => $balance,
+            'payment_type' => $request->payment_type,
         ]);
 
-        $product->decrement('remaining_qty', $qty);
-        $product->increment('received_qty', $qty);
-
-        if (!empty($item['sale_price'])) {
-            $product->update(['sale_price' => $item['sale_price']]);
+        $newCustomer = \App\Models\Customer::find($request->customer_id);
+        if ($newCustomer && $balance > 0) {
+            $newCustomer->increment('balance', $balance);
         }
-        $product->update(['purchase_price' => $rate]);
+
+        return response()->json([
+            'success' => true,
+            'message' => '✅ Sale update ho gaya!'
+        ]);
     }
 
-    $netTotal = max($total - $discount, 0);
-    $balance  = max($netTotal - $paid, 0);
+    public function editData($saleId)
+    {
+        $sale = \App\Models\Sale::with('items.product')->findOrFail($saleId);
 
-    $sale->update([
-        'vendor_id'    => $request->vendor_id,
-        'date'         => $request->date,
-        'total'        => $netTotal,
-        'discount'     => $discount,
-        'paid'         => $paid,
-        'balance'      => $balance,
-        'payment_type' => $request->payment_type,
-    ]);
-
-    $newVendor = \App\Models\Vendor::find($request->vendor_id);
-    if ($newVendor && $balance > 0) {
-        $newVendor->increment('balance', $balance);
+        return response()->json([
+            'success' => true,
+            'sale'    => [
+                'id'           => $sale->id,
+                'date'         => $sale->date,
+                'customer_id'  => $sale->customer_id,
+                'payment_type' => $sale->payment_type,
+                'discount'     => $sale->discount,
+                'paid'         => $sale->paid,
+                'balance'      => $sale->balance,
+                'items'        => $sale->items->map(fn($item) => [
+                    'id'          => $item->id,
+                    'product_id'  => $item->product_id,
+                    'stock_code'  => $item->stock_code,
+                    'qty'         => $item->qty,
+                    'rate'        => $item->rate,
+                    'total'       => $item->total,
+                    'description' => $item->description,
+                ])
+            ]
+        ]);
     }
 
-    return response()->json([
-        'success' => true,
-        'message' => '✅ Purchase update ho gaya!'
-    ]);
-}
+    public function editPurchaseData($saleId)
+    {
+        $sale = \App\Models\Sale::with('items.product')->findOrFail($saleId);
+
+        return response()->json([
+            'success' => true,
+            'sale'    => [
+                'id'           => $sale->id,
+                'date'         => $sale->date,
+                'vendor_id'    => $sale->vendor_id,
+                'payment_type' => $sale->payment_type,
+                'discount'     => $sale->discount,
+                'paid'         => $sale->paid,
+                'balance'      => $sale->balance,
+                'items'        => $sale->items->map(fn($item) => [
+                    'id'          => $item->id,
+                    'product_id'  => $item->product_id,
+                    'stock_code'  => $item->stock_code,
+                    'qty'         => $item->qty,
+                    'rate'        => $item->rate,
+                    'total'       => $item->total,
+                    'description' => $item->description,
+                ])
+            ]
+        ]);
+    }
+
+    public function updatePurchase(Request $request, $saleId)
+    {
+        $sale = \App\Models\Sale::with('items.product')->findOrFail($saleId);
+
+        // Inventory reverse karo
+        foreach ($sale->items as $oldItem) {
+            if ($oldItem->product) {
+                $oldItem->product->increment('remaining_qty', $oldItem->qty);
+                $oldItem->product->decrement('received_qty', $oldItem->qty);
+            }
+        }
+
+        // Old vendor balance reverse karo
+        $oldVendor = \App\Models\Vendor::find($sale->vendor_id);
+        if ($oldVendor && $sale->balance > 0) {
+            $oldVendor->decrement('balance', $sale->balance);
+        }
+
+        $total    = 0;
+        $discount = $request->discount ?? 0;
+        $paid     = $request->paid     ?? 0;
+
+        $sale->items()->delete();
+
+        foreach ($request->items as $item) {
+            if (empty($item['product_id']) || empty($item['qty'])) continue;
+
+            $product = \App\Models\Product::find($item['product_id']);
+            if (!$product) continue;
+
+            $qty      = (int)   $item['qty'];
+            $rate     = (float) $item['rate'];
+            $amt      = $qty * $rate;
+            $total   += $amt;
+
+            \App\Models\SaleItem::create([
+                'sale_id'     => $sale->id,
+                'product_id'  => $product->id,
+                'stock_code'  => $item['stock_code'] ?? $product->stock_code,
+                'qty'         => $qty,
+                'rate'        => $rate,
+                'total'       => $amt,
+                'description' => $item['description'] ?? null,
+            ]);
+
+            // ✅ Average price calculate karo
+            $oldQty   = $product->remaining_qty; // already reversed upar
+            $oldPrice = $product->purchase_price;
+
+            $avgPrice = ($oldQty + $qty) > 0
+                ? (($oldQty * $oldPrice) + ($qty * $rate)) / ($oldQty + $qty)
+                : $rate;
+
+            $product->decrement('remaining_qty', $qty); // wait — pehle avg nikalo phir decrement
+            // Note: upar reverse ho chuka hai, to remaining_qty = purana remaining + old item qty
+            // Ab hum naya qty add kar rahe hain purchase mein
+            $product->increment('received_qty', $qty);
+
+            $updateData = ['purchase_price' => round($avgPrice, 2)];
+            if (!empty($item['sale_price'])) {
+                $updateData['sale_price'] = $item['sale_price'];
+            }
+            $product->update($updateData);
+        }
+
+        $netTotal = max($total - $discount, 0);
+        $balance  = max($netTotal - $paid, 0);
+
+        $sale->update([
+            'vendor_id'    => $request->vendor_id,
+            'date'         => $request->date,
+            'total'        => $netTotal,
+            'discount'     => $discount,
+            'paid'         => $paid,
+            'balance'      => $balance,
+            'payment_type' => $request->payment_type,
+        ]);
+
+        $newVendor = \App\Models\Vendor::find($request->vendor_id);
+        if ($newVendor && $balance > 0) {
+            $newVendor->increment('balance', $balance);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => '✅ Purchase update ho gaya!'
+        ]);
+    }
 }

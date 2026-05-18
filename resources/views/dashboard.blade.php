@@ -57,25 +57,32 @@
     <div style="font-size:12px;color:#3e5a7a;font-weight:600;margin-bottom:8px">💰 Business Balance</div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:10px">
+
+        {{-- Cash --}}
         <div style="color:#3e5a7a">Total Cash</div>
         <div style="font-weight:700;color:#163a6f">Rs. {{ number_format($totalCash) }}</div>
 
+        {{-- Online --}}
         <div style="color:#3e5a7a">Total Online</div>
         <div style="font-weight:700;color:#163a6f">Rs. {{ number_format($totalOnline) }}</div>
 
-        <div style="color:#3e5a7a">+ Payable (Vendor)</div>
-        <div style="font-weight:700;color:#f59e0b">Rs. {{ number_format($totalPayable) }}</div>
-
-        <div style="color:#3e5a7a">- Receivable (Customer)</div>
-        <div style="font-weight:700;color:#ef4444">Rs. {{ number_format($totalReceivable) }}</div>
-
+        {{-- Stock Value — PLUS --}}
         <div style="color:#3e5a7a">+ Stock Value</div>
         <div style="font-weight:700;color:#22c55e">Rs. {{ number_format($totalStockValue) }}</div>
+
+        {{-- Receivable — PLUS (customer se lena hai) --}}
+        <div style="color:#3e5a7a">+ Receivable (Customer)</div>
+        <div style="font-weight:700;color:#22c55e">Rs. {{ number_format($totalReceivable) }}</div>
+
+        {{-- Payable — MINUS (vendor ko dena hai) --}}
+        <div style="color:#3e5a7a">- Payable (Vendor)</div>
+        <div style="font-weight:700;color:#ef4444">Rs. {{ number_format($totalPayable) }}</div>
+
     </div>
 
     <div style="border-top:2px dashed #5a7ca8;padding-top:8px;display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700;color:#163a6f;font-size:13px">= Net Balance</span>
-        <span style="font-weight:900;color:#163a6f;font-size:18px">
+        <span style="font-weight:900;font-size:18px;color:{{ $businessBalance >= 0 ? '#163a6f' : '#ef4444' }}">
             Rs. {{ number_format($businessBalance) }}
         </span>
     </div>

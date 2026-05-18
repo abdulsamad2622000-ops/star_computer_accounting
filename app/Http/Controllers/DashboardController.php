@@ -49,34 +49,34 @@ class DashboardController extends Controller
             ->sum('paid');
 
         // ── Balance Calculation ──────────────────────────────
-        // Sales se cash payments (payment_type = cash)
+        // Sales se cash payments
         $totalCashFromSales = Sale::where('type', 'sale')
             ->where('payment_type', 'cash')
             ->sum('paid');
 
-        // Sales se online payments (payment_type = bank_transfer)
+        // Sales se online payments
         $totalOnlineFromSales = Sale::where('type', 'sale')
             ->where('payment_type', 'bank_transfer')
             ->sum('paid');
 
-        // Customer payments (ledger payments) — cash
+        // Customer payments (ledger) — cash
         $totalCashFromPayments = CustomerPayment::where('method', 'cash')
             ->sum('amount');
 
-        // Customer payments (ledger payments) — online
+        // Customer payments (ledger) — online
         $totalOnlineFromPayments = CustomerPayment::where('method', 'online')
             ->sum('amount');
 
-        // Total cash aur online combine
         $totalCash   = $totalCashFromSales   + $totalCashFromPayments;
         $totalOnline = $totalOnlineFromSales + $totalOnlineFromPayments;
 
-        // Final balance formula:
-        // Cash + Online + Payable - Receivable + StockValue
-        $businessBalance = $totalCash + $totalOnline
-                         + $totalPayable
-                         - $totalReceivable
-                         + $totalStockValue;
+        // ✅ SAHI formula:
+        // Cash + Online + StockValue + Receivable - Payable
+        $businessBalance = $totalCash
+                         + $totalOnline
+                         + $totalStockValue    // asset → PLUS
+                         + $totalReceivable    // customer se lena → PLUS
+                         - $totalPayable;      // vendor ko dena → MINUS
 
         // Total Loss calculation
         $totalLoss = 0;
@@ -95,7 +95,6 @@ class DashboardController extends Controller
             'todayTotal', 'todayCount', 'todayInvoices',
             'todayReceived', 'todayCredit', 'todayCash',
             'totalLoss',
-            // ✅ Naye variables
             'totalCash', 'totalOnline', 'businessBalance'
         ));
     }

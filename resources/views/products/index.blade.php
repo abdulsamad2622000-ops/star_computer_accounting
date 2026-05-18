@@ -24,6 +24,72 @@
     .badge-active   { background:#f0fdf4;color:#166534;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700; }
     .badge-inactive { background:#fef2f2;color:#ef4444;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:700; }
     tr.inactive-row { opacity: 0.6; background: #fafafa !important; }
+
+    /* ✅ Search styles */
+    .search-wrapper { position: relative; }
+    #productSearchInput {
+        border: 1.5px solid #d1d5db;
+        border-radius: 8px;
+        padding: 8px 14px 8px 36px;
+        font-size: 14px;
+        width: 100%;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+    #productSearchInput:focus { border-color: #4f8ef7; box-shadow: 0 0 0 3px #eff6ff; }
+    .search-icon {
+        position: absolute;
+        left: 11px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        font-size: 15px;
+    }
+    #searchSuggestions {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0; right: 0;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+        z-index: 9999;
+        max-height: 320px;
+        overflow-y: auto;
+        display: none;
+    }
+    .suggestion-item {
+        padding: 10px 14px;
+        cursor: pointer;
+        border-bottom: 1px solid #f3f4f6;
+        transition: background 0.15s;
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover { background: #eff6ff; }
+    .suggestion-name { font-weight: 700; font-size: 13px; color: #111827; }
+    .suggestion-meta { font-size: 11px; color: #6b7280; margin-top: 2px; }
+    .suggestion-badge {
+        font-size: 10px;
+        padding: 1px 7px;
+        border-radius: 10px;
+        font-weight: 700;
+        margin-left: 6px;
+    }
+    .badge-qty-ok  { background:#f0fdf4; color:#166534; }
+    .badge-qty-low { background:#fef2f2; color:#ef4444; }
+    .no-suggestion { padding: 14px; text-align:center; color:#9ca3af; font-size:13px; }
+
+    /* ✅ Duplicate alert in modal */
+    #duplicateAlert {
+        display: none;
+        background: #fffbeb;
+        border: 1px solid #fbbf24;
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #92400e;
+    }
 </style>
 @endpush
 
@@ -82,6 +148,17 @@
             <div class="stat-value" style="color:#ef4444">{{ $lowStock }}</div>
             <div class="stat-label">Low Stock Alert</div>
         </div>
+    </div>
+</div>
+
+<!-- ✅ Search Bar -->
+<div class="mb-3">
+    <div class="search-wrapper">
+        <i class="bi bi-search search-icon"></i>
+        <input type="text" id="productSearchInput"
+               placeholder="Product name ya stock code se search karein..."
+               autocomplete="off">
+        <div id="searchSuggestions"></div>
     </div>
 </div>
 
@@ -305,18 +382,32 @@
             <form action="{{ route('products.opening.store') }}" method="POST">
                 @csrf
                 <div class="modal-body">
+
+                    <!-- ✅ Duplicate Warning Box -->
+                    <div id="duplicateAlert">
+                        <strong>⚠️ Yeh product already exist karta hai!</strong><br>
+                        <span id="duplicateInfo"></span><br>
+                        <small>Stock add karne par <strong>qty increase</strong> hogi aur <strong>average price</strong> calculate hoga.</small>
+                    </div>
+
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Product Name *</label>
-                            <input type="text" name="name" class="form-control"
-                                   placeholder="e.g. RAM DDR4" required>
+                            <!-- ✅ Search input with suggestions -->
+                            <div class="search-wrapper">
+                                <i class="bi bi-search search-icon" style="top:38px"></i>
+                                <input type="text" name="name" id="modalProductName"
+                                       class="form-control ps-4" style="padding-left:32px!important"
+                                       placeholder="e.g. RAM DDR4" required autocomplete="off">
+                                <div id="modalSuggestions" style="position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e5e7eb;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.10);z-index:9999;display:none;max-height:220px;overflow-y:auto;"></div>
+                            </div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">
                                 Stock Code
                                 <small class="text-muted">(Optional)</small>
                             </label>
-                            <input type="text" name="stock_code" class="form-control"
+                            <input type="text" name="stock_code" id="modalStockCode" class="form-control"
                                    placeholder="e.g. SC-001">
                         </div>
                         <div class="col-md-6">
@@ -338,8 +429,8 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">Purchase Price *</label>
-                            <input type="number" name="purchase_price" class="form-control"
-                                   placeholder="0.00" min="0" step="0.01" required>
+                            <input type="number" name="purchase_price" id="modalPurchasePrice"
+                                   class="form-control" placeholder="0.00" min="0" step="0.01" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">
@@ -377,7 +468,149 @@
 @push('scripts')
 <script>
 const CAN_SEE_PRICES = {{ $canSeePrices ? 'true' : 'false' }};
+const SEARCH_URL     = "{{ route('products.search') }}";
 
+// =========================================================
+// ✅ TOP SEARCH BAR
+// =========================================================
+let searchTimer;
+const searchInput       = document.getElementById('productSearchInput');
+const searchSuggestions = document.getElementById('searchSuggestions');
+
+if (searchInput) {
+    searchInput.addEventListener('input', function () {
+        clearTimeout(searchTimer);
+        const q = this.value.trim();
+if (q.length < 1) {
+    searchSuggestions.style.display = 'none';
+    // ✅ Sari rows wapas dikhao
+    document.querySelectorAll('#productsTable tbody tr').forEach(r => r.style.display = '');
+    return;
+}
+        searchTimer = setTimeout(() => {
+          fetch(SEARCH_URL + '?q=' + encodeURIComponent(q), {
+    headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+    },
+    credentials: 'same-origin'
+})
+.then(r => r.json())
+                .then(data => {
+                    if (!data.length) {
+                        searchSuggestions.innerHTML = '<div class="no-suggestion">Koi product nahi mila 😕</div>';
+                    } else {
+                        searchSuggestions.innerHTML = data.map(p => `
+                            <div class="suggestion-item" onclick="highlightProduct('${p.name.replace(/'/g,"\\'")}')">
+                                <div class="suggestion-name">
+                                    ${p.name}
+                                    ${p.stock_code ? '<span style="color:#9ca3af;font-size:11px"> · ' + p.stock_code + '</span>' : ''}
+                                    <span class="suggestion-badge ${p.remaining_qty <= 0 ? 'badge-qty-low' : 'badge-qty-ok'}">
+                                        Qty: ${p.remaining_qty}
+                                    </span>
+                                </div>
+                                <div class="suggestion-meta">Vendor: ${p.vendor}</div>
+                            </div>
+                        `).join('');
+                    }
+                    searchSuggestions.style.display = 'block';
+                });
+        }, 250);
+    });
+
+    document.addEventListener('click', e => {
+        if (!e.target.closest('.search-wrapper')) {
+            searchSuggestions.style.display = 'none';
+        }
+    });
+}
+
+function highlightProduct(name) {
+    searchSuggestions.style.display = 'none';
+    searchInput.value = name;
+
+    // Filter table
+    const rows = document.querySelectorAll('#productsTable tbody tr');
+    rows.forEach(row => {
+        row.style.display = row.dataset.name === name.toLowerCase() ? '' : 'none';
+    });
+}
+
+// =========================================================
+// ✅ MODAL SEARCH + DUPLICATE DETECTION
+// =========================================================
+let modalTimer;
+const modalNameInput    = document.getElementById('modalProductName');
+const modalSuggestions  = document.getElementById('modalSuggestions');
+const duplicateAlert    = document.getElementById('duplicateAlert');
+const duplicateInfo     = document.getElementById('duplicateInfo');
+
+if (modalNameInput) {
+    modalNameInput.addEventListener('input', function () {
+        clearTimeout(modalTimer);
+        const q = this.value.trim();
+        duplicateAlert.style.display = 'none';
+
+        if (q.length < 1) { modalSuggestions.style.display = 'none'; return; }
+
+        modalTimer = setTimeout(() => {
+            fetch(SEARCH_URL + '?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.length) {
+                        modalSuggestions.style.display = 'none';
+                        return;
+                    }
+
+                    modalSuggestions.innerHTML = data.map(p => `
+                        <div class="suggestion-item" onclick="selectModalProduct(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+                            <div class="suggestion-name">
+                                ${p.name}
+                                ${p.stock_code ? '<span style="color:#9ca3af;font-size:11px"> · ' + p.stock_code + '</span>' : ''}
+                                <span class="suggestion-badge ${p.remaining_qty <= 0 ? 'badge-qty-low' : 'badge-qty-ok'}">
+                                    Stock: ${p.remaining_qty}
+                                </span>
+                            </div>
+                            <div class="suggestion-meta">Vendor: ${p.vendor} | P.Price: Rs. ${Number(p.purchase_price).toLocaleString()}</div>
+                        </div>
+                    `).join('');
+                    modalSuggestions.style.display = 'block';
+
+                    // Exact match check → show duplicate warning
+                    const exact = data.find(p => p.name.toLowerCase() === q.toLowerCase());
+                    if (exact) {
+                        duplicateInfo.innerHTML = `<strong>${exact.name}</strong> — Stock: ${exact.remaining_qty} | Current Price: Rs. ${Number(exact.purchase_price).toLocaleString()}`;
+                        duplicateAlert.style.display = 'block';
+                    }
+                });
+        }, 300);
+    });
+
+    document.addEventListener('click', e => {
+        if (!e.target.closest('#stockModal')) {
+            if (modalSuggestions) modalSuggestions.style.display = 'none';
+        }
+    });
+}
+
+function selectModalProduct(product) {
+    modalNameInput.value = product.name;
+    if (document.getElementById('modalStockCode') && product.stock_code) {
+        document.getElementById('modalStockCode').value = product.stock_code;
+    }
+    if (document.getElementById('modalPurchasePrice')) {
+        document.getElementById('modalPurchasePrice').value = product.purchase_price;
+    }
+    modalSuggestions.style.display = 'none';
+
+    // Show duplicate warning
+    duplicateInfo.innerHTML = `<strong>${product.name}</strong> — Stock: ${product.remaining_qty} | Current Price: Rs. ${Number(product.purchase_price).toLocaleString()}`;
+    duplicateAlert.style.display = 'block';
+}
+
+// =========================================================
+// ✅ TABLE FILTERS
+// =========================================================
 function filterProducts() {
     const selects   = document.querySelectorAll('#productsTable thead select');
     const rows      = document.querySelectorAll('#productsTable tbody tr');
@@ -420,10 +653,14 @@ function resetProductFilters() {
     document.querySelectorAll('#productsTable thead select')
         .forEach(select => { select.value = ''; });
     document.getElementById('statusFilter').value = 'all';
+    if (searchInput) searchInput.value = '';
     filterProducts();
+    // Show all rows
+    document.querySelectorAll('#productsTable tbody tr').forEach(r => r.style.display = '');
 }
 
 function openStockModal() {
+    if (duplicateAlert) duplicateAlert.style.display = 'none';
     new bootstrap.Modal(document.getElementById('stockModal')).show();
 }
 </script>

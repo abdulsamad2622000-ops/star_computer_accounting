@@ -23,6 +23,33 @@ class ProductController extends Controller
         ));
     }
 
+    // ✅ NEW: Search/Autocomplete API
+    public function search(Request $request)
+    {
+        $query = $request->get('q', '');
+
+        $products = Product::with('vendor')
+            ->where('is_active', true)
+            ->where(function ($q) use ($query) {
+                $q->where('name', 'like', '%' . $query . '%')
+                  ->orWhere('stock_code', 'like', '%' . $query . '%');
+            })
+            ->orderBy('name')
+            ->limit(10)
+            ->get()
+            ->map(fn($p) => [
+                'id'             => $p->id,
+                'name'           => $p->name,
+                'stock_code'     => $p->stock_code,
+                'vendor'         => $p->vendor->name ?? '—',
+                'remaining_qty'  => $p->remaining_qty,
+                'purchase_price' => $p->purchase_price,
+                'sale_price'     => $p->sale_price,
+            ]);
+
+        return response()->json($products);
+    }
+
     public function edit(Product $product)
     {
         $vendors = Vendor::all();
@@ -78,38 +105,59 @@ class ProductController extends Controller
     public function openingStore(Request $request)
     {
         $request->validate([
-            'name'           => 'required|string|unique:products,name',
+            'name'           => 'required|string',
             'opening_qty'    => 'required|integer|min:0',
             'purchase_price' => 'required|numeric|min:0',
         ]);
 
-        if ($request->stock_code) {
-            $existing = Product::where('stock_code', $request->stock_code)
-                ->first();
-            if ($existing) {
-                $existing->increment('received_qty', $request->opening_qty);
-                $existing->increment('remaining_qty', $request->opening_qty);
-                $existing->update([
-                    'purchase_price' => $request->purchase_price,
-                    'sale_price'     => $request->sale_price ?? $existing->sale_price,
-                    'is_active'      => true,
-                ]);
+        $newQty   = (int) $request->opening_qty;
+        $newPrice = (float) $request->purchase_price;
 
-                return redirect()->route('products.index')
-                    ->with('success', '✅ Stock updated — ' . $existing->name);
-            }
+        // ✅ Duplicate check by NAME (case-insensitive)
+        $existing = Product::whereRaw('LOWER(name) = ?', [strtolower(trim($request->name))])->first();
+
+        // ✅ Also check by stock_code if provided
+        if (!$existing && $request->stock_code) {
+            $existing = Product::where('stock_code', $request->stock_code)->first();
         }
 
+       if ($existing) {
+    $oldQty   = $existing->remaining_qty; // stock jo abhi hai
+    $oldPrice = $existing->purchase_price;
+
+    // ✅ Agar remaining zero hai to bhi average sahi rahe
+    if ($oldQty <= 0) {
+        $avgPrice = $newPrice; // koi purana stock nahi, naya price hi average
+    } else {
+        $avgPrice = (($oldQty * $oldPrice) + ($newQty * $newPrice)) / ($oldQty + $newQty);
+    }
+
+    $existing->update([
+        'received_qty'   => $existing->received_qty + $newQty,
+        'remaining_qty'  => $existing->remaining_qty + $newQty,
+        'purchase_price' => round($avgPrice, 2),
+        'sale_price'     => $request->sale_price    ?? $existing->sale_price,
+        'stock_code'     => $request->stock_code    ?? $existing->stock_code,
+        'vendor_id'      => $request->vendor_id     ?? $existing->vendor_id,
+        'is_active'      => true,
+    ]);
+
+    return redirect()->route('products.index')
+        ->with('success', '✅ Stock updated! ' . $existing->name . 
+               ' — Qty +' . $newQty . 
+               ' | Avg Price: Rs. ' . number_format($avgPrice, 2));
+}
+        // ✅ New product — create fresh
         Product::create([
-            'name'           => $request->name,
-            'stock_code'     => $request->stock_code   ?? null,
-            'vendor_id'      => $request->vendor_id    ?? null,
-            'purchase_price' => $request->purchase_price,
-            'sale_price'     => $request->sale_price   ?? 0,
-            'received_qty'   => $request->opening_qty,
+            'name'           => trim($request->name),
+            'stock_code'     => $request->stock_code ?? null,
+            'vendor_id'      => $request->vendor_id  ?? null,
+            'purchase_price' => $newPrice,
+            'sale_price'     => $request->sale_price ?? 0,
+            'received_qty'   => $newQty,
             'sold_qty'       => 0,
-            'remaining_qty'  => $request->opening_qty,
-            'alert_qty'      => $request->alert_qty    ?? 5,
+            'remaining_qty'  => $newQty,
+            'alert_qty'      => $request->alert_qty  ?? 5,
             'is_active'      => true,
         ]);
 
