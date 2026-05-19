@@ -79,15 +79,18 @@ class DashboardController extends Controller
                          - $totalPayable;      // vendor ko dena → MINUS
 
         // Total Loss calculation
-        $totalLoss = 0;
-        $saleItems = SaleItem::with('product')->get();
-        foreach ($saleItems as $item) {
-            $purchasePrice = $item->product->purchase_price ?? 0;
-            $salePrice     = $item->rate;
-            if ($salePrice < $purchasePrice) {
-                $totalLoss += ($purchasePrice - $salePrice) * $item->qty;
-            }
-        }
+      $totalLoss = 0;
+$saleItems = SaleItem::whereHas('sale', fn($q) => 
+    $q->where('type', 'sale')
+)->with('product')->get();
+
+foreach ($saleItems as $item) {
+    $purchasePrice = $item->product->purchase_price ?? 0;
+    $salePrice     = $item->rate;
+    if ($salePrice > 0 && $salePrice < $purchasePrice) {
+        $totalLoss += ($purchasePrice - $salePrice) * $item->qty;
+    }
+}
 
         return view('dashboard', compact(
             'totalReceivable', 'totalPayable', 'totalCustomers',

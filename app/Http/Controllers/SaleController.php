@@ -326,15 +326,17 @@ class SaleController extends Controller
                     }
                 }
 
-                SaleItem::create([
-                    'sale_id'     => $purchase->id,
-                    'product_id'  => $product->id,
-                    'stock_code'  => $product->stock_code,
-                    'qty'         => $newQty,
-                    'rate'        => $newPrice,
-                    'total'       => $newQty * $newPrice,
-                    'description' => $item['description'] ?? null,
-                ]);
+             // Sale store mein:
+SaleItem::create([
+    'sale_id'                 => $sale->id,
+    'product_id'              => $item['product_id'],
+    'stock_code'              => $product->stock_code,
+    'qty'                     => $item['qty'],
+    'rate'                    => $item['rate'],
+    'purchase_price_at_time'  => $product->purchase_price, // ✅ save karo
+    'total'                   => $item['qty'] * $item['rate'],
+    'description'             => $item['description'] ?? null,
+]);
             }
 
             if ($balance > 0) {

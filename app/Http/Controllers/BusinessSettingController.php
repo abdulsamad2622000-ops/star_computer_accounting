@@ -9,16 +9,25 @@ use Illuminate\Http\Request;
 
 class BusinessSettingController extends Controller
 {
-    public function edit()
-    {
-        $setting  = BusinessSetting::first();
-        $contacts = BusinessContact::all();
-        $banks    = BusinessBank::all();
-
-        return view('settings.business', compact(
-            'setting', 'contacts', 'banks'
-        ));
+   public function edit()
+{
+    // ✅ Agar row nahi hai to empty create kar do
+    $setting  = \App\Models\BusinessSetting::first();
+    
+    if (!$setting) {
+        $setting = \App\Models\BusinessSetting::create([
+            'business_name' => '',
+            'address'       => '',
+            'phone'         => '',
+            'email'         => '',
+        ]);
     }
+
+    $contacts = \App\Models\BusinessContact::all();
+    $banks    = \App\Models\BusinessBank::all();
+
+    return view('settings.business', compact('setting', 'contacts', 'banks'));
+}
 
     public function update(Request $request)
     {
@@ -26,18 +35,16 @@ class BusinessSettingController extends Controller
             'business_name' => 'required',
         ]);
 
-        // Business Settings update
-        $setting = BusinessSetting::first();
-        $setting->update([
-            'business_name'      => $request->business_name,
-            'tagline'            => $request->tagline,
-            'address'            => $request->address,
-            'ntn'                => $request->ntn,
-            'notes'              => $request->notes,
-            'thank_you_message'  => $request->thank_you_message,
-        ]);
+        $setting = BusinessSetting::firstOrNew([]);
+        $setting->fill([
+            'business_name'     => $request->business_name,
+            'tagline'           => $request->tagline,
+            'address'           => $request->address,
+            'ntn'               => $request->ntn,
+            'notes'             => $request->notes,
+            'thank_you_message' => $request->thank_you_message,
+        ])->save();
 
-        // Contacts update
         BusinessContact::truncate();
         if ($request->contacts) {
             foreach ($request->contacts as $contact) {
@@ -50,20 +57,16 @@ class BusinessSettingController extends Controller
             }
         }
 
-        // Banks update
         if ($request->banks) {
             foreach ($request->banks as $i => $bank) {
                 if (empty($bank['bank_name'])) continue;
 
                 $existing = BusinessBank::find($bank['id'] ?? null);
-
                 $qrCode = null;
 
-                // QR Code upload
                 if (isset($bank['qr_file']) && $request->hasFile("banks.{$i}.qr_file")) {
                     $file   = $request->file("banks.{$i}.qr_file");
                     $qrCode = $file->store('qr_codes', 'public');
-
                     if ($existing && $existing->qr_code) {
                         \Storage::disk('public')->delete($existing->qr_code);
                     }
@@ -89,7 +92,6 @@ class BusinessSettingController extends Controller
             }
         }
 
-        // Delete removed banks
         if ($request->delete_banks) {
             foreach ($request->delete_banks as $bankId) {
                 $bank = BusinessBank::find($bankId);

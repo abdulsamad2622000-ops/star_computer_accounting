@@ -1,7 +1,6 @@
-@extends('layouts.app')
-@section('title', 'Business Settings')
+<?php $__env->startSection('title', 'Business Settings'); ?>
 
-@push('styles')
+<?php $__env->startPush('styles'); ?>
 <style>
     .section-title {
         font-size: 14px;
@@ -46,16 +45,17 @@
         margin-top: 6px;
     }
 </style>
-@endpush
+<?php $__env->stopPush(); ?>
 
-@section('content')
+<?php $__env->startSection('content'); ?>
 
-@if(session('success'))
+<?php if(session('success')): ?>
 <div class="alert alert-success alert-dismissible fade show">
-    {{ session('success') }}
+    <?php echo e(session('success')); ?>
+
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
-@endif
+<?php endif; ?>
 
 <div class="row justify-content-center">
     <div class="col-md-9">
@@ -64,10 +64,10 @@
                 <i class="bi bi-gear me-2"></i>Business Settings
             </h5>
 
-            <form action="{{ route('settings.business.update') }}"
+            <form action="<?php echo e(route('settings.business.update')); ?>"
                   method="POST"
                   enctype="multipart/form-data">
-                @csrf @method('PUT')
+                <?php echo csrf_field(); ?> <?php echo method_field('PUT'); ?>
 
                 <!-- Business Info -->
                 <div class="section-title">Business Info</div>
@@ -76,26 +76,26 @@
                         <label class="form-label">Business Name *</label>
                         <input type="text" name="business_name"
                                class="form-control"
-                               value="{{ $setting?->business_name ?? '' }}"
+                               value="<?php echo e($setting?->business_name ?? ''); ?>"
                                required>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Tagline</label>
                         <input type="text" name="tagline"
                                class="form-control"
-                               value="{{ $setting?->tagline }}">
+                               value="<?php echo e($setting?->tagline); ?>">
                     </div>
                     <div class="col-md-8">
                         <label class="form-label">Address</label>
                         <input type="text" name="address"
                                class="form-control"
-                               value="{{ $setting?->address }}">
+                               value="<?php echo e($setting?->address); ?>">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">NTN Number</label>
                         <input type="text" name="ntn"
                                class="form-control"
-                               value="{{ $setting?->ntn }}"
+                               value="<?php echo e($setting?->ntn); ?>"
                                placeholder="e.g. 50615561">
                     </div>
                 </div>
@@ -113,35 +113,35 @@
                 </div>
 
                 <div id="contactsContainer">
-                    @forelse($contacts as $i => $contact)
-                    <div class="contact-row" id="contact_{{ $i }}">
+                    <?php $__empty_1 = true; $__currentLoopData = $contacts; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $i => $contact): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <div class="contact-row" id="contact_<?php echo e($i); ?>">
                         <div class="row g-2 align-items-center">
                             <div class="col-md-5">
                                 <label class="form-label">Name *</label>
                                 <input type="text"
-                                       name="contacts[{{ $i }}][name]"
+                                       name="contacts[<?php echo e($i); ?>][name]"
                                        class="form-control"
-                                       value="{{ $contact->name }}"
+                                       value="<?php echo e($contact->name); ?>"
                                        placeholder="e.g. Rehan">
                             </div>
                             <div class="col-md-5">
                                 <label class="form-label">Phone *</label>
                                 <input type="text"
-                                       name="contacts[{{ $i }}][phone]"
+                                       name="contacts[<?php echo e($i); ?>][phone]"
                                        class="form-control"
-                                       value="{{ $contact->phone }}"
+                                       value="<?php echo e($contact->phone); ?>"
                                        placeholder="+92 3XX XXXXXXX">
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
                                 <button type="button"
                                         class="remove-btn w-100"
-                                        onclick="removeContact('contact_{{ $i }}')">
+                                        onclick="removeContact('contact_<?php echo e($i); ?>')">
                                     🗑️ Remove
                                 </button>
                             </div>
                         </div>
                     </div>
-                    @empty
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <div class="contact-row" id="contact_0">
                         <div class="row g-2 align-items-center">
                             <div class="col-md-5">
@@ -167,7 +167,7 @@
                             </div>
                         </div>
                     </div>
-                    @endforelse
+                    <?php endif; ?>
                 </div>
 
                 <hr>
@@ -183,42 +183,42 @@
                 </div>
 
                 <div id="banksContainer">
-                    @forelse($banks as $i => $bank)
-                    <div class="bank-row-item" id="bank_{{ $bank->id }}">
+                    <?php $__empty_1 = true; $__currentLoopData = $banks; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $i => $bank): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                    <div class="bank-row-item" id="bank_<?php echo e($bank->id); ?>">
                         <input type="hidden"
-                               name="banks[{{ $i }}][id]"
-                               value="{{ $bank->id }}">
+                               name="banks[<?php echo e($i); ?>][id]"
+                               value="<?php echo e($bank->id); ?>">
                         <div class="row g-2">
                             <div class="col-md-3">
                                 <label class="form-label">Bank Name *</label>
                                 <input type="text"
-                                       name="banks[{{ $i }}][bank_name]"
+                                       name="banks[<?php echo e($i); ?>][bank_name]"
                                        class="form-control"
-                                       value="{{ $bank->bank_name }}"
+                                       value="<?php echo e($bank->bank_name); ?>"
                                        placeholder="e.g. Meezan Bank">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">Account Title</label>
                                 <input type="text"
-                                       name="banks[{{ $i }}][account_title]"
+                                       name="banks[<?php echo e($i); ?>][account_title]"
                                        class="form-control"
-                                       value="{{ $bank->account_title }}"
+                                       value="<?php echo e($bank->account_title); ?>"
                                        placeholder="STAR COMPUTER">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">Account Number</label>
                                 <input type="text"
-                                       name="banks[{{ $i }}][account_number]"
+                                       name="banks[<?php echo e($i); ?>][account_number]"
                                        class="form-control"
-                                       value="{{ $bank->account_number }}"
+                                       value="<?php echo e($bank->account_number); ?>"
                                        placeholder="01780104703562">
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">IBAN</label>
                                 <input type="text"
-                                       name="banks[{{ $i }}][iban]"
+                                       name="banks[<?php echo e($i); ?>][iban]"
                                        class="form-control"
-                                       value="{{ $bank->iban }}"
+                                       value="<?php echo e($bank->iban); ?>"
                                        placeholder="PK28MEZN...">
                             </div>
                             <div class="col-md-4">
@@ -227,25 +227,25 @@
                                     <small class="text-muted">(Optional)</small>
                                 </label>
                                 <input type="file"
-                                       name="banks[{{ $i }}][qr_file]"
+                                       name="banks[<?php echo e($i); ?>][qr_file]"
                                        class="form-control"
                                        accept="image/*">
-                                @if($bank->qr_code)
-                                <img src="{{ asset('storage/'.$bank->qr_code) }}"
+                                <?php if($bank->qr_code): ?>
+                                <img src="<?php echo e(asset('storage/'.$bank->qr_code)); ?>"
                                      class="qr-preview"
                                      alt="QR Code">
-                                @endif
+                                <?php endif; ?>
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
                                 <button type="button"
                                         class="remove-btn w-100"
-                                        onclick="removeBank({{ $bank->id }}, 'bank_{{ $bank->id }}')">
+                                        onclick="removeBank(<?php echo e($bank->id); ?>, 'bank_<?php echo e($bank->id); ?>')">
                                     🗑️ Remove
                                 </button>
                             </div>
                         </div>
                     </div>
-                    @empty
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                     <div class="bank-row-item" id="bank_new_0">
                         <div class="row g-2">
                             <div class="col-md-3">
@@ -292,7 +292,7 @@
                             </div>
                         </div>
                     </div>
-                    @endforelse
+                    <?php endif; ?>
                 </div>
 
                 <!-- Hidden delete banks -->
@@ -308,13 +308,13 @@
                         <textarea name="notes"
                                   class="form-control"
                                   rows="4"
-                                  placeholder="Warranty info...">{{ $setting?->notes }}</textarea>
+                                  placeholder="Warranty info..."><?php echo e($setting?->notes); ?></textarea>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Thank You Message</label>
                         <textarea name="thank_you_message"
                                   class="form-control"
-                                  rows="4">{{ $setting?->thank_you_message }}</textarea>
+                                  rows="4"><?php echo e($setting?->thank_you_message); ?></textarea>
                     </div>
                 </div>
 
@@ -326,12 +326,12 @@
     </div>
 </div>
 
-@endsection
+<?php $__env->stopSection(); ?>
 
-@push('scripts')
+<?php $__env->startPush('scripts'); ?>
 <script>
-let contactCount = {{ $contacts->count() }};
-let bankCount    = {{ $banks->count() }};
+let contactCount = <?php echo e($contacts->count()); ?>;
+let bankCount    = <?php echo e($banks->count()); ?>;
 let newBankCount = 0;
 
 function addContact() {
@@ -438,4 +438,5 @@ function removeNewBank(id) {
     document.getElementById(id)?.remove();
 }
 </script>
-@endpush
+<?php $__env->stopPush(); ?>
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\xampp\htdocs\star_computer_accounting\resources\views/settings/business.blade.php ENDPATH**/ ?>
