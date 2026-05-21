@@ -1,7 +1,6 @@
-@extends('layouts.app')
-@section('title', 'Vendor Manager')
+<?php $__env->startSection('title', 'Vendor Manager'); ?>
 
-@section('content')
+<?php $__env->startSection('content'); ?>
 
 <!-- Top Cards -->
 <div class="row g-3 mb-4">
@@ -10,7 +9,7 @@
             <div class="stat-icon" style="background:#fff7ed">
                 <i class="bi bi-arrow-up-circle" style="color:#f59e0b"></i>
             </div>
-            <div class="stat-value">Rs. {{ number_format($totalPayable) }}</div>
+            <div class="stat-value">Rs. <?php echo e(number_format($totalPayable)); ?></div>
             <div class="stat-label">Total Payable</div>
         </div>
     </div>
@@ -19,7 +18,7 @@
             <div class="stat-icon" style="background:#eff6ff">
                 <i class="bi bi-check-circle" style="color:#4f8ef7"></i>
             </div>
-            <div class="stat-value">{{ $settledCount }}</div>
+            <div class="stat-value"><?php echo e($settledCount); ?></div>
             <div class="stat-label">Settled Vendors</div>
         </div>
     </div>
@@ -32,7 +31,7 @@
             <button onclick="window.print()" class="btn btn-sm btn-outline-secondary no-print">
                 <i class="bi bi-printer"></i> Print
             </button>
-          <a href="{{ route('vendors.export.pdf') }}" class="btn btn-sm btn-outline-danger no-print">
+          <a href="<?php echo e(route('vendors.export.pdf')); ?>" class="btn btn-sm btn-outline-danger no-print">
 
                 <i class="bi bi-file-pdf"></i> PDF
             </a>
@@ -40,12 +39,12 @@
         <span class="table-card-title">
             <i class="bi bi-shop me-2"></i>All Vendors
         </span>
-        <a href="{{ route('vendors.create') }}" class="btn btn-primary btn-sm">
+        <a href="<?php echo e(route('vendors.create')); ?>" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg me-1"></i> Add Vendor
         </a>
     </div>
 
-    {{-- ✅ Search Box --}}
+    
     <div class="px-3 pt-3 pb-2 no-print" style="position:relative;">
         <div style="position:relative;">
             <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9ca3af;"></i>
@@ -88,52 +87,52 @@
                 </tr>
             </thead>
             <tbody id="vendorTableBody">
-                @forelse($vendors as $i => $vendor)
+                <?php $__empty_1 = true; $__currentLoopData = $vendors; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $i => $vendor): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                 <tr class="vendor-row"
                     style="cursor:pointer"
-                    data-name="{{ strtolower($vendor->name) }}"
-                    data-contact="{{ strtolower($vendor->contact1 ?? '') }}"
-                    data-href="{{ route('vendors.show', $vendor) }}">
-                    <td>{{ $i + 1 }}</td>
-                    <td><strong>{{ $vendor->name }}</strong></td>
-                    <td>{{ $vendor->contact1 ?? '—' }}</td>
-                    <td>{{ $vendor->cnic ?? '—' }}</td>
+                    data-name="<?php echo e(strtolower($vendor->name)); ?>"
+                    data-contact="<?php echo e(strtolower($vendor->contact1 ?? '')); ?>"
+                    data-href="<?php echo e(route('vendors.show', $vendor)); ?>">
+                    <td><?php echo e($i + 1); ?></td>
+                    <td><strong><?php echo e($vendor->name); ?></strong></td>
+                    <td><?php echo e($vendor->contact1 ?? '—'); ?></td>
+                    <td><?php echo e($vendor->cnic ?? '—'); ?></td>
                     <td>
-                        <span class="memo-no">Rs. {{ number_format($vendor->balance) }}</span>
+                        <span class="memo-no">Rs. <?php echo e(number_format($vendor->balance)); ?></span>
                     </td>
                     <td>
-                        @if($vendor->balance > 0)
+                        <?php if($vendor->balance > 0): ?>
                             <span class="badge-payable">🟡 Payable</span>
-                        @else
+                        <?php else: ?>
                             <span class="badge-settled">🟢 Settled</span>
-                        @endif
+                        <?php endif; ?>
                     </td>
                     <td onclick="event.stopPropagation()">
-                        <a href="{{ route('vendors.edit', $vendor) }}" class="btn btn-sm btn-outline-primary">
+                        <a href="<?php echo e(route('vendors.edit', $vendor)); ?>" class="btn btn-sm btn-outline-primary">
                             <i class="bi bi-pencil"></i>
                         </a>
-                        <form action="{{ route('vendors.destroy', $vendor) }}" method="POST" class="d-inline"
+                        <form action="<?php echo e(route('vendors.destroy', $vendor)); ?>" method="POST" class="d-inline"
                               onsubmit="return confirm('Vendor delete karein?')">
-                            @csrf @method('DELETE')
+                            <?php echo csrf_field(); ?> <?php echo method_field('DELETE'); ?>
                             <button class="btn btn-sm btn-outline-danger">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </form>
                     </td>
                 </tr>
-                @empty
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                 <tr>
                     <td colspan="7" class="text-center text-muted py-4">Koi vendor nahi mila</td>
                 </tr>
-                @endforelse
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
 </div>
 
-@push('scripts')
+<?php $__env->startPush('scripts'); ?>
 <script>
-const allVendors = {!! json_encode($vendorsJson) !!};
+const allVendors = <?php echo json_encode($vendorsJson); ?>;
 
 let vendHlIdx = -1;
 let filteredVendors = [];
@@ -247,6 +246,7 @@ document.addEventListener('click', function(e) {
     }
 });
 </script>
-@endpush
+<?php $__env->stopPush(); ?>
 
-@endsection
+<?php $__env->stopSection(); ?>
+<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH C:\xampp\htdocs\star_computer_accounting\resources\views/vendors/index.blade.php ENDPATH**/ ?>

@@ -9,17 +9,26 @@ use Illuminate\Http\Request;
 
 class VendorController extends Controller
 {
-    public function index()
-    {
-        $vendors      = Vendor::latest()->get();
-        $totalPayable = Vendor::sum('balance');
-        $settledCount = Vendor::where('balance', 0)->count();
+   public function index()
+{
+    $vendors      = Vendor::latest()->get();
+    $totalPayable = Vendor::sum('balance');
+    $settledCount = Vendor::where('balance', 0)->count();
 
-        return view('vendors.index', compact(
-            'vendors', 'totalPayable', 'settledCount'
-        ));
-    }
+    $vendorsJson = $vendors->map(function($v) {
+        return [
+            'name'    => $v->name,
+            'contact' => $v->contact1 ?? '—',
+            'balance' => $v->balance,
+            'status'  => $v->balance > 0 ? 'payable' : 'settled',
+            'url'     => route('vendors.show', $v),
+        ];
+    });
 
+    return view('vendors.index', compact(
+        'vendors', 'totalPayable', 'settledCount', 'vendorsJson'
+    ));
+}
     public function create()
     {
         return view('vendors.create');

@@ -10,17 +10,26 @@ use Illuminate\Http\Request;
 
 class CustomerController extends Controller
 {
-    public function index()
-    {
-        $customers       = Customer::latest()->get();
-        $totalReceivable = Customer::sum('balance');
-        $settledCount    = Customer::where('balance', 0)->count();
+   public function index()
+{
+    $customers       = Customer::latest()->get();
+    $totalReceivable = Customer::sum('balance');
+    $settledCount    = Customer::where('balance', 0)->count();
 
-        return view('customers.index', compact(
-            'customers', 'totalReceivable', 'settledCount'
-        ));
-    }
+    $customersJson = $customers->map(function($c) {
+        return [
+            'name'    => $c->name,
+            'contact' => $c->contact1 ?? '—',
+            'balance' => $c->balance,
+            'status'  => $c->balance > 0 ? 'receivable' : 'settled',
+            'url'     => route('customers.show', $c),
+        ];
+    });
 
+    return view('customers.index', compact(
+        'customers', 'totalReceivable', 'settledCount', 'customersJson'
+    ));
+}
     public function create()
     {
         return view('customers.create');
