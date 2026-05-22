@@ -9,14 +9,14 @@ return new class extends Migration
     public function up()
     {
         Schema::table('products', function (Blueprint $table) {
-            $table->unique('name');
+            $table->dropUnique(['name']);
         });
     }
 
     public function down()
     {
         Schema::table('products', function (Blueprint $table) {
-            $table->dropUnique(['name']);
+            $table->unique('name');
         });
     }
 };

@@ -229,18 +229,11 @@ public function deleteLedger(Vendor $vendor)
             }
         }
 
-        // Purchase items permanently delete karo
-        $purchase->items()->forceDelete();
-
-        // StockReturns bhi delete karo (agar hain)
-        $purchase->returns()->forceDelete();
-
-        // Purchase permanently delete karo
-        $purchase->forceDelete();
+        $purchase->items()->delete();
+$purchase->delete();
     }
 
-    // Vendor payments permanently delete karo
-    VendorPayment::where('vendor_id', $vendor->id)->forceDelete();
+ VendorPayment::where('vendor_id', $vendor->id)->delete();
 
     // Balance reset karo
     $vendor->update(['balance' => $vendor->opening_balance ?? 0]);

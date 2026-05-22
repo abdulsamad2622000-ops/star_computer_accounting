@@ -134,7 +134,7 @@ class SaleController extends Controller
 
                 SaleItem::create([
                     'sale_id'     => $sale->id,
-                    'product_id'  => $item['product_id'],
+                    'product_id'  => $product->id,
                     'stock_code'  => $product->stock_code,
                     'qty'         => $item['qty'],
                     'rate'        => $item['rate'],
@@ -252,11 +252,9 @@ class SaleController extends Controller
                 $newPrice = (float) $item['purchase_price'];
 
                 if (!empty($item['stock_code'])) {
-                    // ── Stock code se dhundo ──────────────────────────
                     $existingProduct = Product::where('stock_code', $item['stock_code'])->first();
 
                     if ($existingProduct) {
-                        // ✅ Average price formula
                         $oldQty   = $existingProduct->remaining_qty;
                         $oldPrice = $existingProduct->purchase_price;
 
@@ -289,11 +287,9 @@ class SaleController extends Controller
                     }
 
                 } else {
-                    // ── Naam se dhundo ────────────────────────────────
                     $existingProduct = Product::whereRaw('LOWER(name) = ?', [strtolower(trim($item['name']))])->first();
 
                     if ($existingProduct) {
-                        // ✅ Average price formula
                         $oldQty   = $existingProduct->remaining_qty;
                         $oldPrice = $existingProduct->purchase_price;
 
@@ -326,17 +322,15 @@ class SaleController extends Controller
                     }
                 }
 
-             // Sale store mein:
-SaleItem::create([
-    'sale_id'                 => $sale->id,
-    'product_id'              => $item['product_id'],
-    'stock_code'              => $product->stock_code,
-    'qty'                     => $item['qty'],
-    'rate'                    => $item['rate'],
-    'purchase_price_at_time'  => $product->purchase_price, // ✅ save karo
-    'total'                   => $item['qty'] * $item['rate'],
-    'description'             => $item['description'] ?? null,
-]);
+                SaleItem::create([
+                    'sale_id'     => $purchase->id,
+                    'product_id'  => $product->id,
+                    'stock_code'  => $product->stock_code,
+                    'qty'         => $newQty,
+                    'rate'        => $newPrice,
+                    'total'       => $newQty * $newPrice,
+                    'description' => $item['description'] ?? null,
+                ]);
             }
 
             if ($balance > 0) {
@@ -420,7 +414,6 @@ SaleItem::create([
                 $saleItem->update(['rate' => $item['purchase_price']]);
 
                 if ($saleItem->product) {
-                    // ✅ Average price calculate karo
                     $product  = $saleItem->product;
                     $oldQty   = $product->remaining_qty;
                     $oldPrice = $product->purchase_price;
@@ -536,7 +529,6 @@ SaleItem::create([
             'items'        => 'required|array',
         ]);
 
-        // Inventory reverse karo (old quantities)
         foreach ($sale->items as $oldItem) {
             if ($oldItem->product) {
                 $oldItem->product->increment('remaining_qty', $oldItem->qty);
@@ -544,7 +536,6 @@ SaleItem::create([
             }
         }
 
-        // Old customer balance reverse karo
         $oldCustomer = \App\Models\Customer::find($sale->customer_id);
         if ($oldCustomer && $sale->balance > 0) {
             $oldCustomer->decrement('balance', $sale->balance);
@@ -552,7 +543,7 @@ SaleItem::create([
 
         $total    = 0;
         $discount = $request->discount ?? 0;
-        $paid     = $request->paid     ?? 0;
+        $paid     = $request->paid ?? 0;
 
         $sale->items()->delete();
 
@@ -581,8 +572,10 @@ SaleItem::create([
             $product->increment('sold_qty', $qty);
         }
 
-        $netTotal = max($total - $discount, 0);
-        $balance  = max($netTotal - $paid, 0);
+        $netTotal = round(max($total - $discount, 0), 2);
+        $paid     = round($paid, 2);
+        $balance  = round(max($netTotal - $paid, 0), 2);
+        if ($balance < 1) $balance = 0;
 
         $sale->update([
             'customer_id'  => $request->customer_id,
@@ -663,7 +656,6 @@ SaleItem::create([
     {
         $sale = \App\Models\Sale::with('items.product')->findOrFail($saleId);
 
-        // Inventory reverse karo
         foreach ($sale->items as $oldItem) {
             if ($oldItem->product) {
                 $oldItem->product->increment('remaining_qty', $oldItem->qty);
@@ -671,7 +663,6 @@ SaleItem::create([
             }
         }
 
-        // Old vendor balance reverse karo
         $oldVendor = \App\Models\Vendor::find($sale->vendor_id);
         if ($oldVendor && $sale->balance > 0) {
             $oldVendor->decrement('balance', $sale->balance);
@@ -679,7 +670,7 @@ SaleItem::create([
 
         $total    = 0;
         $discount = $request->discount ?? 0;
-        $paid     = $request->paid     ?? 0;
+        $paid     = $request->paid ?? 0;
 
         $sale->items()->delete();
 
@@ -689,10 +680,26 @@ SaleItem::create([
             $product = \App\Models\Product::find($item['product_id']);
             if (!$product) continue;
 
-            $qty      = (int)   $item['qty'];
-            $rate     = (float) $item['rate'];
-            $amt      = $qty * $rate;
-            $total   += $amt;
+            $qty   = (int)   $item['qty'];
+            $rate  = (float) $item['rate'];
+            $amt   = $qty * $rate;
+            $total += $amt;
+
+            $oldQty   = $product->remaining_qty;
+            $oldPrice = $product->purchase_price;
+
+            $avgPrice = ($oldQty + $qty) > 0
+                ? (($oldQty * $oldPrice) + ($qty * $rate)) / ($oldQty + $qty)
+                : $rate;
+
+            $product->increment('remaining_qty', $qty);
+            $product->increment('received_qty', $qty);
+
+            $updateData = ['purchase_price' => round($avgPrice, 2)];
+            if (!empty($item['sale_price'])) {
+                $updateData['sale_price'] = $item['sale_price'];
+            }
+            $product->update($updateData);
 
             \App\Models\SaleItem::create([
                 'sale_id'     => $sale->id,
@@ -703,29 +710,12 @@ SaleItem::create([
                 'total'       => $amt,
                 'description' => $item['description'] ?? null,
             ]);
-
-            // ✅ Average price calculate karo
-            $oldQty   = $product->remaining_qty; // already reversed upar
-            $oldPrice = $product->purchase_price;
-
-            $avgPrice = ($oldQty + $qty) > 0
-                ? (($oldQty * $oldPrice) + ($qty * $rate)) / ($oldQty + $qty)
-                : $rate;
-
-            $product->decrement('remaining_qty', $qty); // wait — pehle avg nikalo phir decrement
-            // Note: upar reverse ho chuka hai, to remaining_qty = purana remaining + old item qty
-            // Ab hum naya qty add kar rahe hain purchase mein
-            $product->increment('received_qty', $qty);
-
-            $updateData = ['purchase_price' => round($avgPrice, 2)];
-            if (!empty($item['sale_price'])) {
-                $updateData['sale_price'] = $item['sale_price'];
-            }
-            $product->update($updateData);
         }
 
-        $netTotal = max($total - $discount, 0);
-        $balance  = max($netTotal - $paid, 0);
+        $netTotal = round(max($total - $discount, 0), 2);
+        $paid     = round($paid, 2);
+        $balance  = round(max($netTotal - $paid, 0), 2);
+        if ($balance < 1) $balance = 0;
 
         $sale->update([
             'vendor_id'    => $request->vendor_id,
