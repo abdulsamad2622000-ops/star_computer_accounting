@@ -8,14 +8,13 @@ use App\Models\SaleItem;
 use App\Models\Customer;
 use App\Models\Vendor;
 use App\Models\CustomerPayment;
-use App\Models\VendorPayment;
 use App\Models\StaffPermission;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        // Staff permission check
+        // ── Staff Permission Check ───────────────────────────
         if (auth()->user()->role !== 'admin') {
             $perms = StaffPermission::where('user_id', auth()->id())->first();
             if (!$perms || !$perms->dashboard_access) {
@@ -23,82 +22,74 @@ class DashboardController extends Controller
             }
         }
 
+        // ── Customers & Vendors ──────────────────────────────
         $totalReceivable = Customer::sum('balance');
         $totalPayable    = Vendor::sum('balance');
         $totalCustomers  = Customer::count();
 
-        $totalProducts   = Product::where('is_active', true)->count();
+        // ── Products / Stock ─────────────────────────────────
+        $totalProducts = Product::where('is_active', true)->count();
+
         $totalStockValue = Product::where('is_active', true)
             ->get()
             ->sum(fn($p) => $p->remaining_qty * $p->purchase_price);
-        $lowStockCount   = Product::where('is_active', true)
+
+        $lowStockCount = Product::where('is_active', true)
             ->whereColumn('remaining_qty', '<=', 'alert_qty')
             ->count();
 
-        $todaySales    = Sale::where('type', 'sale')
+        // ── Today's Sales ────────────────────────────────────
+        $todaySales = Sale::where('type', 'sale')
             ->whereDate('date', today())
             ->get();
 
         $todayTotal    = $todaySales->sum('total');
-        $todayCount    = $todaySales->count();
-        $todayInvoices = $todayCount;
+        $todayInvoices = $todaySales->count();
         $todayReceived = $todaySales->sum('paid');
         $todayCredit   = $todaySales->sum('balance');
-        $todayCash     = $todaySales
-            ->where('payment_type', 'cash')
-            ->sum('paid');
+        $todayCash     = $todaySales->where('payment_type', 'cash')->sum('paid');
 
-        // ── Balance Calculation ──────────────────────────────
-        // Sales se cash payments
-        $totalCashFromSales = Sale::where('type', 'sale')
-            ->where('payment_type', 'cash')
-            ->sum('paid');
+        // ── Total Cash Received (Customer se) ────────────────
+        $totalCash = Sale::where('type', 'sale')
+                        ->where('payment_type', 'cash')
+                        ->sum('paid')
+                   + CustomerPayment::where('method', 'cash')
+                        ->sum('amount');
 
-        // Sales se online payments
-        $totalOnlineFromSales = Sale::where('type', 'sale')
-            ->where('payment_type', 'bank_transfer')
-            ->sum('paid');
+        // ── Total Online Received (Customer se) ──────────────
+        $totalOnline = Sale::where('type', 'sale')
+                          ->where('payment_type', 'bank_transfer')
+                          ->sum('paid')
+                     + CustomerPayment::where('method', 'online')
+                          ->sum('amount');
 
-        // Customer payments (ledger) — cash
-        $totalCashFromPayments = CustomerPayment::where('method', 'cash')
-            ->sum('amount');
-
-        // Customer payments (ledger) — online
-        $totalOnlineFromPayments = CustomerPayment::where('method', 'online')
-            ->sum('amount');
-
-        $totalCash   = $totalCashFromSales   + $totalCashFromPayments;
-        $totalOnline = $totalOnlineFromSales + $totalOnlineFromPayments;
-
-        // ✅ SAHI formula:
-        // Cash + Online + StockValue + Receivable - Payable
+        // ── Business Balance ─────────────────────────────────
         $businessBalance = $totalCash
                          + $totalOnline
-                         + $totalStockValue    // asset → PLUS
-                         + $totalReceivable    // customer se lena → PLUS
-                         - $totalPayable;      // vendor ko dena → MINUS
+                         + $totalStockValue
+                         + $totalReceivable
+                         - $totalPayable;
 
-        // Total Loss calculation
-      $totalLoss = 0;
-$saleItems = SaleItem::whereHas('sale', fn($q) => 
-    $q->where('type', 'sale')
-)->with('product')->get();
+        // ── Below Cost Sales Loss ────────────────────────────
+        $totalLoss = 0;
+        $saleItems = SaleItem::whereHas('sale', fn($q) =>
+            $q->where('type', 'sale')
+        )->with('product')->get();
 
-foreach ($saleItems as $item) {
-    $purchasePrice = $item->product->purchase_price ?? 0;
-    $salePrice     = $item->rate;
-    if ($salePrice > 0 && $salePrice < $purchasePrice) {
-        $totalLoss += ($purchasePrice - $salePrice) * $item->qty;
-    }
-}
+        foreach ($saleItems as $item) {
+            $purchasePrice = $item->purchase_price ?? $item->product->purchase_price ?? 0;
+            if ($item->rate > 0 && $item->rate < $purchasePrice) {
+                $totalLoss += ($purchasePrice - $item->rate) * $item->qty;
+            }
+        }
 
         return view('dashboard', compact(
             'totalReceivable', 'totalPayable', 'totalCustomers',
             'totalProducts', 'totalStockValue', 'lowStockCount',
-            'todayTotal', 'todayCount', 'todayInvoices',
-            'todayReceived', 'todayCredit', 'todayCash',
-            'totalLoss',
-            'totalCash', 'totalOnline', 'businessBalance'
+            'todayTotal', 'todayInvoices', 'todayReceived',
+            'todayCredit', 'todayCash',
+            'totalCash', 'totalOnline', 'businessBalance',
+            'totalLoss'
         ));
     }
 }
