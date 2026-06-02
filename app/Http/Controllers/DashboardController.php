@@ -8,6 +8,7 @@ use App\Models\SaleItem;
 use App\Models\Customer;
 use App\Models\Vendor;
 use App\Models\CustomerPayment;
+use App\Models\VendorPayment;
 use App\Models\StaffPermission;
 
 class DashboardController extends Controller
@@ -49,21 +50,36 @@ class DashboardController extends Controller
         $todayCredit   = $todaySales->sum('balance');
         $todayCash     = $todaySales->where('payment_type', 'cash')->sum('paid');
 
-        // ── Total Cash Received (Customer se) ────────────────
+        // ── Total Cash ───────────────────────────────────────
+        // + Sales cash received
+        // + Customer ledger cash payments
+        // - Vendor ko cash diya
         $totalCash = Sale::where('type', 'sale')
                         ->where('payment_type', 'cash')
                         ->sum('paid')
                    + CustomerPayment::where('method', 'cash')
+                        ->sum('amount')
+                   - VendorPayment::where('method', 'cash')
                         ->sum('amount');
 
-        // ── Total Online Received (Customer se) ──────────────
+        // ── Total Online ─────────────────────────────────────
+        // + Sales online received
+        // + Customer ledger online payments
+        // - Vendor ko online diya
         $totalOnline = Sale::where('type', 'sale')
                           ->where('payment_type', 'bank_transfer')
                           ->sum('paid')
                      + CustomerPayment::where('method', 'online')
+                          ->sum('amount')
+                     - VendorPayment::where('method', 'online')
                           ->sum('amount');
 
         // ── Business Balance ─────────────────────────────────
+        //   + Total Cash      (hamare paas physical cash)
+        //   + Total Online    (hamare paas bank mein)
+        //   + Stock Value     (inventory asset)
+        //   + Receivable      (customer se lena baaki)
+        //   - Payable         (vendor ko dena baaki)
         $businessBalance = $totalCash
                          + $totalOnline
                          + $totalStockValue
