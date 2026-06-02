@@ -80,11 +80,9 @@ class DashboardController extends Controller
         //   + Stock Value     (inventory asset)
         //   + Receivable      (customer se lena baaki)
         //   - Payable         (vendor ko dena baaki)
-        $businessBalance = $totalCash
-                         + $totalOnline
-                         + $totalStockValue
-                         + $totalReceivable
-                         - $totalPayable;
+      $businessBalance = $totalStockValue
+                 + $totalReceivable
+                 - $totalPayable;
 
         // ── Below Cost Sales Loss ────────────────────────────
         $totalLoss = 0;
