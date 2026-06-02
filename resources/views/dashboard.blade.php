@@ -37,11 +37,6 @@
 <div class="card mb-4" style="border:2px solid #163a6f;border-radius:10px;padding:16px;background:#e7f1ff">
     <div style="font-size:12px;color:#3e5a7a;font-weight:600;margin-bottom:8px">💰 Business Balance</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:10px">
-        <div style="color:#3e5a7a">Total Cash</div>
-        <div style="font-weight:700;color:#163a6f">Rs. {{ number_format($totalCash) }}</div>
-
-        <div style="color:#3e5a7a">Total Online</div>
-        <div style="font-weight:700;color:#163a6f">Rs. {{ number_format($totalOnline) }}</div>
 
         <div style="color:#3e5a7a">Stock Value</div>
         <div style="font-weight:700;color:#163a6f">Rs. {{ number_format($totalStockValue) }}</div>
@@ -51,6 +46,7 @@
 
         <div style="color:#3e5a7a">Payable (Vendor)</div>
         <div style="font-weight:700;color:#ef4444">Rs. {{ number_format($totalPayable) }}</div>
+
     </div>
     <div style="border-top:2px dashed #5a7ca8;padding-top:10px;display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700;color:#163a6f;font-size:13px">= Net Balance</span>
@@ -247,7 +243,6 @@
                         })
                         ->groupBy(fn($item) => $item->sale->customer_id ?? 'walkin');
                 @endphp
-
                 @forelse($lossItems as $customerId => $items)
                 @php
                     $customer = $items->first()->sale->customer;
@@ -257,13 +252,9 @@
                     });
                 @endphp
                 <div style="padding:10px 16px;background:#fff7f7;border-bottom:2px solid #fecaca;display:flex;justify-content:space-between;align-items:center">
-                    <span class="fw-bold" style="color:#dc2626;font-size:13px">
-                        👤 {{ $customer->name ?? 'Walk-in Customer' }}
-                    </span>
+                    <span class="fw-bold" style="color:#dc2626;font-size:13px">👤 {{ $customer->name ?? 'Walk-in Customer' }}</span>
                     <div style="display:flex;align-items:center;gap:10px">
-                        <span style="color:#ef4444;font-weight:700;font-size:13px">
-                            Total Loss: Rs. {{ number_format($customerLoss) }}
-                        </span>
+                        <span style="color:#ef4444;font-weight:700;font-size:13px">Total Loss: Rs. {{ number_format($customerLoss) }}</span>
                         @if($customer)
                         <a href="{{ route('customers.show', $customer) }}" class="btn btn-sm btn-outline-danger" style="font-size:11px;border-radius:6px">View Ledger →</a>
                         @endif
@@ -290,10 +281,8 @@
                             $totalItemLoss = $lossPerUnit * $item->qty;
                         @endphp
                         <tr>
-                            <td class="px-3 py-2">
-                                <a href="{{ route('sales.invoice', $item->sale) }}" style="color:#4f8ef7;font-size:11px">{{ $item->sale->memo_no }}</a>
-                            </td>
-                           <td class="px-3 py-2 text-muted">{{ \Carbon\Carbon::parse($item->sale->date)->format('d M Y') }}</td>
+                            <td class="px-3 py-2"><a href="{{ route('sales.invoice', $item->sale) }}" style="color:#4f8ef7;font-size:11px">{{ $item->sale->memo_no }}</a></td>
+                            <td class="px-3 py-2 text-muted">{{ \Carbon\Carbon::parse($item->sale->date)->format('d M Y') }}</td>
                             <td class="px-3 py-2 fw-bold">{{ $item->product->name ?? '—' }}</td>
                             <td class="px-3 py-2">{{ $item->qty }}</td>
                             <td class="px-3 py-2 text-muted">Rs. {{ number_format($pp) }}</td>
