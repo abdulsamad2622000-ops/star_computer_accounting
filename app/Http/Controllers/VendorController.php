@@ -273,4 +273,44 @@ $purchase->delete();
         "Ledger-{$vendor->name}.xlsx"
     );
 }
+
+
+public function settleAgainstCustomer(Request $request, Vendor $vendor)
+    {
+        $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'amount'      => 'required|numeric|min:1',
+            'date'        => 'required|date',
+            'note'        => 'nullable|string|max:255',
+        ]);
+
+        $customer = \App\Models\Customer::findOrFail($request->customer_id);
+        $amount   = $request->amount;
+
+        // Vendor ko dena tha — ab settle ho gaya
+        $vendor->decrement('balance', $amount);
+
+        // Customer se lena tha — ab settle ho gaya
+        $customer->decrement('balance', $amount);
+
+        // Vendor ledger mein record
+        \App\Models\VendorPayment::create([
+            'vendor_id' => $vendor->id,
+            'date'      => $request->date,
+            'amount'    => $amount,
+            'method'    => 'adjustment',
+            'note'      => 'Settled against Customer: ' . $customer->name . ($request->note ? ' | ' . $request->note : ''),
+        ]);
+
+        // Customer ledger mein record
+        \App\Models\CustomerPayment::create([
+            'customer_id' => $customer->id,
+            'date'        => $request->date,
+            'amount'      => $amount,
+            'method'      => 'adjustment',
+            'note'        => 'Settled against Vendor: ' . $vendor->name . ($request->note ? ' | ' . $request->note : ''),
+        ]);
+
+        return back()->with('success', 'Settlement ho gaya! Vendor: -' . number_format($amount) . ' | Customer: -' . number_format($amount));
+    }
 }

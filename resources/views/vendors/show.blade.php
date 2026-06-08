@@ -538,6 +538,54 @@
     </form>
 </div>
 
+<!-- Settle Against Customer Form -->
+@php
+    $linkedCustomers = \App\Models\Customer::orderBy('name')->get();
+@endphp
+@if($linkedCustomers->count() > 0 && $vendor->balance > 0)
+<div class="pay-form-wrap no-print" style="background:#fff7ed;border-color:#fed7aa;margin-top:12px">
+    <div class="fw-bold mb-2" style="color:#92400e;font-size:13px">
+        🔄 Settle Against Customer
+    </div>
+    <form action="{{ route('vendors.settle.customer', $vendor) }}" method="POST">
+        @csrf
+        <div class="d-flex gap-2 align-items-end flex-wrap">
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#92400e">Date *</label>
+                <input type="date" name="date" class="form-control"
+                       value="{{ date('Y-m-d') }}" style="width:140px" required>
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#92400e">Customer *</label>
+                <select name="customer_id" class="form-select" style="width:200px" required>
+                    <option value="">-- Select Customer --</option>
+                    @foreach($linkedCustomers as $customer)
+                    <option value="{{ $customer->id }}">
+                        {{ $customer->name }} (Rs. {{ number_format($customer->balance) }})
+                    </option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#92400e">Amount *</label>
+                <input type="number" name="amount" class="form-control"
+                       placeholder="Rs. 0" style="width:130px" min="1"
+                       max="{{ $vendor->balance }}" required>
+            </div>
+            <div>
+                <label style="font-size:11px;font-weight:600;color:#92400e">Note</label>
+                <input type="text" name="note" class="form-control"
+                       placeholder="Optional..." style="width:150px">
+            </div>
+            <button type="submit" class="btn btn-warning btn-sm"
+                    style="height:34px;padding:0 16px"
+                    onclick="return confirm('Settle karna chahte ho?')">
+                🔄 Settle
+            </button>
+        </div>
+    </form>
+</div>
+@endif
 <!-- Edit Purchase Modal -->
 <div class="modal fade" id="editPurchaseModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
