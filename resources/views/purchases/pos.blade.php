@@ -484,8 +484,15 @@ function searchVendor(query) {
         v.name.toLowerCase().includes(query.toLowerCase()) ||
         (v.contact1 && v.contact1.includes(query))
     );
-    if (!filtered.length) { list.style.display = 'none'; return; }
-    list.innerHTML = filtered.map(v => `
+if (!filtered.length) {
+    list.innerHTML = `
+        <div class="autocomplete-item" style="color:#dc2626;font-weight:600"
+             onclick="confirmNewProduct('${query.replace(/'/g,"\\'")}', ${rowId})">
+            ➕ "${query}" — Naya Product Banao
+        </div>`;
+    list.style.display = 'block';
+    return;
+}    list.innerHTML = filtered.map(v => `
         <div onclick="selectVendor(${v.id},'${v.name}','${v.contact1 ?? ''}','${v.cnic ?? ''}')"
              style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0f0f0;color:#0e2a4f"
              onmouseover="this.style.background='#e7f1ff'"
@@ -512,8 +519,15 @@ function searchTransferVendor(query) {
         v.name.toLowerCase().includes(query.toLowerCase()) ||
         (v.contact1 && v.contact1.includes(query))
     );
-    if (!filtered.length) { list.style.display = 'none'; return; }
-    list.innerHTML = filtered.map(v => `
+if (!filtered.length) {
+    list.innerHTML = `
+        <div class="autocomplete-item" style="color:#dc2626;font-weight:600"
+             onclick="confirmNewProduct('${query.replace(/'/g,"\\'")}', ${rowId})">
+            ➕ "${query}" — Naya Product Banao
+        </div>`;
+    list.style.display = 'block';
+    return;
+}    list.innerHTML = filtered.map(v => `
         <div onclick="selectTransferVendor(${v.id},'${v.name}')"
              style="padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0f0f0;color:#0e2a4f"
              onmouseover="this.style.background='#e7f1ff'"
@@ -567,6 +581,15 @@ function selectProduct(product, rowId) {
     }
     document.getElementById(`list_${rowId}`).style.display = 'none';
     if (IS_ADMIN) recalcRow(rowId);
+}
+function confirmNewProduct(name, rowId) {
+    if (confirm(`"${name}" system mein nahi hai.\n\nNaya product banana chahte ho?`)) {
+        document.getElementById(`name_${rowId}`).value = name;
+        document.getElementById(`list_${rowId}`).style.display = 'none';
+    } else {
+        document.getElementById(`name_${rowId}`).value = '';
+        document.getElementById(`list_${rowId}`).style.display = 'none';
+    }
 }
 
 // ── Calc ─────────────────────────────────────────────────
