@@ -91,16 +91,34 @@ class ProductController extends Controller
     }
 
     public function destroy(Product $product)
-    {
-        $product->update(['is_active' => !$product->is_active]);
+{
+    // Agar delete request hai
+    if (request('action') === 'delete') {
+        $salesCount = \App\Models\SaleItem::where('product_id', $product->id)->count();
 
-        $msg = $product->is_active
-            ? '✅ Product enable ho gaya!'
-            : '🚫 Product disable ho gaya!';
+        if ($product->remaining_qty > 0) {
+            return redirect()->route('products.index')
+                ->with('error', '❌ Delete nahi ho sakta — pehle stock zero karo!');
+        }
 
+        if ($salesCount > 0) {
+            return redirect()->route('products.index')
+                ->with('error', '❌ Delete nahi ho sakta — is product ki ' . $salesCount . ' sale/purchase records hain!');
+        }
+
+        $product->delete();
         return redirect()->route('products.index')
-            ->with('success', $msg);
+            ->with('success', '🗑️ Product permanently delete ho gaya!');
     }
+
+    // Warna inactive/active toggle
+    $product->update(['is_active' => !$product->is_active]);
+    $msg = $product->is_active
+        ? '✅ Product enable ho gaya!'
+        : '🚫 Product disable ho gaya!';
+    return redirect()->route('products.index')
+        ->with('success', $msg);
+}
 
     public function openingStore(Request $request)
     {
