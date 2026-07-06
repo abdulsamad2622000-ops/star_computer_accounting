@@ -338,20 +338,7 @@
                         </a>
                         @endif
                        @if($isAdmin)
-<form action="{{ route('products.destroy', $product) }}"
-      method="POST" class="d-inline"
-      onsubmit="return confirm('{{ $product->is_active ? 'Disable karein?' : 'Enable karein?' }}')">
-    @csrf @method('DELETE')
-    @if($product->is_active)
-        <button class="btn btn-sm btn-outline-danger" title="Disable">
-            <i class="bi bi-slash-circle"></i>
-        </button>
-    @else
-        <button class="btn btn-sm btn-outline-success" title="Enable">
-            <i class="bi bi-check-circle"></i>
-        </button>
-    @endif
-</form>
+
 
 {{-- Permanent Delete --}}
 @if($product->remaining_qty <= 0)
