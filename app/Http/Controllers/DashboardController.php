@@ -97,10 +97,7 @@ foreach ($saleItems as $item) {
     $purchasePrice = $item->purchase_price ?? $item->product->purchase_price ?? 0;
     if ($item->rate > 0 && $item->rate < $purchasePrice) {
         $totalLoss += ($purchasePrice - $item->rate) * $item->qty;
-    }
-}
-
-        return view('dashboard', compact(
+    return view('dashboard', compact(
             'totalReceivable', 'totalPayable', 'totalCustomers',
             'totalProducts', 'totalStockValue', 'lowStockCount',
             'todayTotal', 'todayInvoices', 'todayReceived',
