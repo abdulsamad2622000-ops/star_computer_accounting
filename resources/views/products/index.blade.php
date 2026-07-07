@@ -496,9 +496,23 @@
                     <td>{{ $product->remaining_qty }}</td>
                     <td>{{ $product->deleted_at->format('d M Y') }}</td>
                     <td>
-                        <form action="{{ route('products.restore', $product->id) }}"
+                       <form action="{{ route('products.restore', $product->id) }}"
                               method="POST" class="d-inline"
-                              onsubmit="return
+                              onsubmit="return confirm('Restore karna chahte ho?')">
+                            @csrf
+                            <button class="btn btn-sm btn-success">
+                                <i class="bi bi-arrow-counterclockwise"></i> Restore
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
+
 @endsection
 
 @push('scripts')
