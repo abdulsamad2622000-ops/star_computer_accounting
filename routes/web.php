@@ -71,8 +71,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('products', ProductController::class);
     });
     Route::post('products/opening/store', [ProductController::class, 'openingStore'])->name('products.opening.store')->middleware('staff.permission:inventory_add_stock');
-    Route::post('products/{product}/adjust-qty', [ProductController::class, 'adjustQty'])->name('products.adjust.qty');
-
+Route::post('products/{product}/adjust-qty', [ProductController::class, 'adjustQty'])->name('products.adjust.qty');
+Route::post('products/{product}/restore', [ProductController::class, 'restore'])->name('products.restore')->withTrashed();
     // ── Sale Point ─────────────────────────────
     Route::middleware('staff.permission:sale_access')->group(function () {
         Route::get('sales/pos', [SaleController::class, 'pos'])->name('sales.pos');

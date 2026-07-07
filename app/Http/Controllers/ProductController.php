@@ -8,20 +8,21 @@ use Illuminate\Http\Request;
 
 class ProductController extends Controller
 {
-    public function index()
-    {
-        $products   = Product::with('vendor')->get();
-        $vendors    = Vendor::orderBy('name')->get();
-        $totalValue = $products->where('is_active', true)
-            ->sum(fn($p) => $p->remaining_qty * $p->purchase_price);
-        $lowStock   = $products->where('is_active', true)
-            ->filter(fn($p) => $p->remaining_qty <= $p->alert_qty)
-            ->count();
+   public function index()
+{
+    $products   = Product::with('vendor')->get();
+    $vendors    = Vendor::orderBy('name')->get();
+    $totalValue = $products->where('is_active', true)
+        ->sum(fn($p) => $p->remaining_qty * $p->purchase_price);
+    $lowStock   = $products->where('is_active', true)
+        ->filter(fn($p) => $p->remaining_qty <= $p->alert_qty)
+        ->count();
+    $deletedProducts = Product::onlyTrashed()->with('vendor')->get();
 
-        return view('products.index', compact(
-            'products', 'vendors', 'totalValue', 'lowStock'
-        ));
-    }
+    return view('products.index', compact(
+        'products', 'vendors', 'totalValue', 'lowStock', 'deletedProducts'
+    ));
+}
 
     // ✅ NEW: Search/Autocomplete API
     public function search(Request $request)
@@ -90,35 +91,26 @@ class ProductController extends Controller
             ->with('success', '✅ Product update ho gaya!');
     }
 
-    public function destroy(Product $product)
+   public function destroy(Product $product)
 {
-    // Agar delete request hai
-    if (request('action') === 'delete') {
-        $salesCount = \App\Models\SaleItem::where('product_id', $product->id)->count();
-
-        if ($product->remaining_qty > 0) {
-            return redirect()->route('products.index')
-                ->with('error', '❌ Delete nahi ho sakta — pehle stock zero karo!');
-        }
-
-        if ($salesCount > 0) {
-            return redirect()->route('products.index')
-                ->with('error', '❌ Delete nahi ho sakta — is product ki ' . $salesCount . ' sale/purchase records hain!');
-        }
-
-        $product->delete();
-        return redirect()->route('products.index')
-            ->with('success', '🗑️ Product permanently delete ho gaya!');
-    }
-
-    // Warna inactive/active toggle
-    $product->update(['is_active' => !$product->is_active]);
-    $msg = $product->is_active
-        ? '✅ Product enable ho gaya!'
-        : '🚫 Product disable ho gaya!';
+    // Soft delete — history safe, restore possible
+    $product->delete();
+    
     return redirect()->route('products.index')
-        ->with('success', $msg);
+        ->with('success', '🗑️ Product delete ho gaya! Restore karne ke liye admin se rabta karein.');
 }
+
+
+public function restore($id)
+{
+    $product = Product::withTrashed()->findOrFail($id);
+    $product->restore();
+    
+    return redirect()->route('products.index')
+        ->with('success', '✅ Product restore ho gaya!');
+}
+
+
 
     public function openingStore(Request $request)
     {
