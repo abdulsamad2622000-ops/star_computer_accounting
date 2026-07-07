@@ -37,16 +37,12 @@
 <div class="card mb-4" style="border:2px solid #163a6f;border-radius:10px;padding:16px;background:#e7f1ff">
     <div style="font-size:12px;color:#3e5a7a;font-weight:600;margin-bottom:8px">💰 Business Balance</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;margin-bottom:10px">
-
         <div style="color:#3e5a7a">Stock Value</div>
         <div style="font-weight:700;color:#163a6f">Rs. {{ number_format($totalStockValue) }}</div>
-
         <div style="color:#3e5a7a">Receivable (Customer)</div>
         <div style="font-weight:700;color:#163a6f">Rs. {{ number_format($totalReceivable) }}</div>
-
         <div style="color:#3e5a7a">Payable (Vendor)</div>
         <div style="font-weight:700;color:#ef4444">Rs. {{ number_format($totalPayable) }}</div>
-
     </div>
     <div style="border-top:2px dashed #5a7ca8;padding-top:10px;display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700;color:#163a6f;font-size:13px">= Net Balance</span>
@@ -87,10 +83,15 @@
     </div>
     @if($totalLoss > 0)
     <div class="col-md-4">
-        <div class="stat-card" style="background:#fef2f2;border:1px solid #fecaca;cursor:pointer" onclick="openLossModal()">
+        <div class="stat-card" style="background:#fef2f2;border:1px solid #fecaca;cursor:pointer" onclick="openLossModal('this_month')">
             <div class="stat-icon" style="background:#fee2e2"><i class="bi bi-graph-down-arrow" style="color:#ef4444"></i></div>
             <div class="stat-value" style="color:#ef4444">Rs. {{ number_format($totalLoss) }}</div>
-            <div class="stat-label" style="color:#dc2626">📉 Below Cost Sales Loss <i class="bi bi-eye ms-1"></i></div>
+            <div class="stat-label" style="color:#dc2626">
+                📉 Below Cost Loss
+                <span style="font-size:10px;display:block;margin-top:2px;color:#ef4444">
+                    {{ now()->format('F Y') }} <i class="bi bi-eye ms-1"></i>
+                </span>
+            </div>
         </div>
     </div>
     @endif
@@ -232,33 +233,90 @@
                 <h6 class="modal-title fw-bold" style="color:#ef4444">📉 Below Cost Sales — Customer Wise List</h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-0">
-                @php
-                    $lossItems = \App\Models\SaleItem::whereHas('sale', fn($q) => $q->where('type', 'sale'))
-                        ->with(['sale.customer', 'product'])
-                        ->get()
-                        ->filter(function($item) {
-                            $pp = $item->purchase_price ?? $item->product->purchase_price ?? 0;
-                            return $item->rate > 0 && $item->rate < $pp;
-                        })
-                        ->groupBy(fn($item) => $item->sale->customer_id ?? 'walkin');
-                @endphp
-                @forelse($lossItems as $customerId => $items)
-                @php
-                    $customer = $items->first()->sale->customer;
-                    $customerLoss = $items->sum(function($item) {
-                        $pp = $item->purchase_price ?? $item->product->purchase_price ?? 0;
-                        return ($pp - $item->rate) * $item->qty;
-                    });
-                @endphp
+            <div style="padding:10px 16px;background:#fff7f7;border-bottom:1px solid #fecaca;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <small style="color:#92400e;font-weight:600">Filter:</small>
+                <button onclick="loadLossData('this_month')" id="btn_this_month"
+                        class="btn btn-sm" style="font-size:11px;background:#ef4444;color:#fff;border-radius:20px">
+                    📅 This Month
+                </button>
+                <button onclick="loadLossData('last_month')" id="btn_last_month"
+                        class="btn btn-sm btn-outline-danger" style="font-size:11px;border-radius:20px">
+                    📅 Last Month
+                </button>
+                <button onclick="loadLossData('all')" id="btn_all"
+                        class="btn btn-sm btn-outline-secondary" style="font-size:11px;border-radius:20px">
+                    📅 All Time
+                </button>
+                <input type="date" id="loss_from" class="form-control form-control-sm" style="width:130px;font-size:11px">
+                <span style="font-size:11px;color:#92400e">to</span>
+                <input type="date" id="loss_to" class="form-control form-control-sm" style="width:130px;font-size:11px">
+                <button onclick="loadLossData('custom')" class="btn btn-sm btn-outline-danger" style="font-size:11px;border-radius:20px">Go</button>
+            </div>
+            <div class="modal-body p-0" id="lossModalBody">
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-hourglass-split" style="font-size:24px"></i><br>
+                    <span style="font-size:13px">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@endsection
+
+@push('scripts')
+<script>
+function openPayableModal() { new bootstrap.Modal(document.getElementById('payableModal')).show(); }
+function openReceivableModal() { new bootstrap.Modal(document.getElementById('receivableModal')).show(); }
+
+function openLossModal(filter) {
+    new bootstrap.Modal(document.getElementById('lossModal')).show();
+    loadLossData(filter || 'this_month');
+}
+
+function loadLossData(filter) {
+    // Button active states
+    ['this_month','last_month','all'].forEach(f => {
+        const btn = document.getElementById('btn_' + f);
+        if(btn) {
+            btn.style.background = f === filter ? '#ef4444' : '';
+            btn.style.color = f === filter ? '#fff' : '';
+            btn.className = f === filter
+                ? 'btn btn-sm'
+                : 'btn btn-sm btn-outline-' + (f === 'all' ? 'secondary' : 'danger');
+            btn.style.borderRadius = '20px';
+            btn.style.fontSize = '11px';
+        }
+    });
+
+    const body = document.getElementById('lossModalBody');
+    body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-danger" style="width:2rem;height:2rem"></div></div>';
+
+    let url = '/dashboard/loss-data?filter=' + filter;
+    if(filter === 'custom') {
+        const from = document.getElementById('loss_from').value;
+        const to   = document.getElementById('loss_to').value;
+        if(!from || !to) { alert('Date range select karo!'); return; }
+        url += '&from=' + from + '&to=' + to;
+    }
+
+    fetch(url, {
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(!data.items || data.items.length === 0) {
+            body.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-check-circle" style="font-size:24px;color:#22c55e"></i><br><span style="font-size:13px">✅ Is period mein koi below cost sale nahi!</span></div>';
+            return;
+        }
+
+        let html = '';
+        data.items.forEach(group => {
+            html += `
                 <div style="padding:10px 16px;background:#fff7f7;border-bottom:2px solid #fecaca;display:flex;justify-content:space-between;align-items:center">
-                    <span class="fw-bold" style="color:#dc2626;font-size:13px">👤 {{ $customer->name ?? 'Walk-in Customer' }}</span>
-                    <div style="display:flex;align-items:center;gap:10px">
-                        <span style="color:#ef4444;font-weight:700;font-size:13px">Total Loss: Rs. {{ number_format($customerLoss) }}</span>
-                        @if($customer)
-                        <a href="{{ route('customers.show', $customer) }}" class="btn btn-sm btn-outline-danger" style="font-size:11px;border-radius:6px">View Ledger →</a>
-                        @endif
-                    </div>
+                    <span class="fw-bold" style="color:#dc2626;font-size:13px">👤 ${group.customer}</span>
+                    <span style="color:#ef4444;font-weight:700;font-size:13px">Total Loss: Rs. ${group.total_loss.toLocaleString()}</span>
                 </div>
                 <table class="table table-hover mb-0" style="font-size:12px">
                     <thead style="background:#f9fafb">
@@ -273,43 +331,26 @@
                             <th class="px-3 py-2">Total Loss</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        @foreach($items as $item)
-                        @php
-                            $pp = $item->purchase_price ?? $item->product->purchase_price ?? 0;
-                            $lossPerUnit = $pp - $item->rate;
-                            $totalItemLoss = $lossPerUnit * $item->qty;
-                        @endphp
-                        <tr>
-                            <td class="px-3 py-2"><a href="{{ route('sales.invoice', $item->sale) }}" style="color:#4f8ef7;font-size:11px">{{ $item->sale->memo_no }}</a></td>
-                            <td class="px-3 py-2 text-muted">{{ \Carbon\Carbon::parse($item->sale->date)->format('d M Y') }}</td>
-                            <td class="px-3 py-2 fw-bold">{{ $item->product->name ?? '—' }}</td>
-                            <td class="px-3 py-2">{{ $item->qty }}</td>
-                            <td class="px-3 py-2 text-muted">Rs. {{ number_format($pp) }}</td>
-                            <td class="px-3 py-2" style="color:#ef4444">Rs. {{ number_format($item->rate) }}</td>
-                            <td class="px-3 py-2" style="color:#ef4444">Rs. {{ number_format($lossPerUnit) }}</td>
-                            <td class="px-3 py-2 fw-bold" style="color:#dc2626">Rs. {{ number_format($totalItemLoss) }}</td>
-                        </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-                @empty
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-check-circle" style="font-size:24px;color:#22c55e"></i><br>
-                    <span style="font-size:13px">✅ Koi below cost sale nahi!</span>
-                </div>
-                @endforelse
-            </div>
-        </div>
-    </div>
-</div>
-
-@endsection
-
-@push('scripts')
-<script>
-function openPayableModal() { new bootstrap.Modal(document.getElementById('payableModal')).show(); }
-function openReceivableModal() { new bootstrap.Modal(document.getElementById('receivableModal')).show(); }
-function openLossModal() { new bootstrap.Modal(document.getElementById('lossModal')).show(); }
+                    <tbody>`;
+            group.sales.forEach(s => {
+                html += `<tr>
+                    <td class="px-3 py-2"><a href="/sales/${s.sale_id}/invoice" style="color:#4f8ef7;font-size:11px">${s.memo_no}</a></td>
+                    <td class="px-3 py-2 text-muted">${s.date}</td>
+                    <td class="px-3 py-2 fw-bold">${s.product}</td>
+                    <td class="px-3 py-2">${s.qty}</td>
+                    <td class="px-3 py-2 text-muted">Rs. ${s.purchase_price.toLocaleString()}</td>
+                    <td class="px-3 py-2" style="color:#ef4444">Rs. ${s.sale_price.toLocaleString()}</td>
+                    <td class="px-3 py-2" style="color:#ef4444">Rs. ${s.loss_per_unit.toLocaleString()}</td>
+                    <td class="px-3 py-2 fw-bold" style="color:#dc2626">Rs. ${s.total_loss.toLocaleString()}</td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+        });
+        body.innerHTML = html;
+    })
+    .catch(() => {
+        body.innerHTML = '<div class="text-center py-5 text-muted">Error loading data</div>';
+    });
+}
 </script>
 @endpush

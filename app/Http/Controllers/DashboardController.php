@@ -85,17 +85,20 @@ class DashboardController extends Controller
                  - $totalPayable;
 
         // ── Below Cost Sales Loss ────────────────────────────
-        $totalLoss = 0;
-        $saleItems = SaleItem::whereHas('sale', fn($q) =>
-            $q->where('type', 'sale')
-        )->with('product')->get();
+        // ── Below Cost Sales Loss (Current Month) ────────────
+$totalLoss = 0;
+$saleItems = SaleItem::whereHas('sale', fn($q) =>
+    $q->where('type', 'sale')
+     ->whereMonth('date', now()->month)
+     ->whereYear('date', now()->year)
+)->with('product')->get();
 
-        foreach ($saleItems as $item) {
-            $purchasePrice = $item->purchase_price ?? $item->product->purchase_price ?? 0;
-            if ($item->rate > 0 && $item->rate < $purchasePrice) {
-                $totalLoss += ($purchasePrice - $item->rate) * $item->qty;
-            }
-        }
+foreach ($saleItems as $item) {
+    $purchasePrice = $item->purchase_price ?? $item->product->purchase_price ?? 0;
+    if ($item->rate > 0 && $item->rate < $purchasePrice) {
+        $totalLoss += ($purchasePrice - $item->rate) * $item->qty;
+    }
+}
 
         return view('dashboard', compact(
             'totalReceivable', 'totalPayable', 'totalCustomers',
@@ -106,4 +109,77 @@ class DashboardController extends Controller
             'totalLoss'
         ));
     }
+
+
+    public function lossData(Request $request)
+{
+    $filter = $request->get('filter', 'this_month');
+
+    $query = \App\Models\SaleItem::whereHas('sale', fn($q) =>
+        $q->where('type', 'sale')
+    )->with(['sale.customer', 'product']);
+
+    // Date filter
+    if ($filter === 'this_month') {
+        $query->whereHas('sale', fn($q) =>
+            $q->whereMonth('date', now()->month)
+              ->whereYear('date', now()->year)
+        );
+    } elseif ($filter === 'last_month') {
+        $query->whereHas('sale', fn($q) =>
+            $q->whereMonth('date', now()->subMonth()->month)
+              ->whereYear('date', now()->subMonth()->year)
+        );
+    } elseif ($filter === 'custom') {
+        $from = $request->get('from');
+        $to   = $request->get('to');
+        if ($from && $to) {
+            $query->whereHas('sale', fn($q) =>
+                $q->whereBetween('date', [$from, $to])
+            );
+        }
+    }
+    // 'all' = no date filter
+
+    $items = $query->get()
+        ->filter(function($item) {
+            $pp = $item->purchase_price ?? $item->product->purchase_price ?? 0;
+            return $item->rate > 0 && $item->rate < $pp;
+        })
+        ->groupBy(fn($item) => $item->sale->customer_id ?? 'walkin');
+
+    $result = [];
+    foreach ($items as $customerId => $groupItems) {
+        $customer = $groupItems->first()->sale->customer;
+        $totalLoss = $groupItems->sum(function($item) {
+            $pp = $item->purchase_price ?? $item->product->purchase_price ?? 0;
+            return ($pp - $item->rate) * $item->qty;
+        });
+
+        $sales = [];
+        foreach ($groupItems as $item) {
+            $pp = $item->purchase_price ?? $item->product->purchase_price ?? 0;
+            $lossPerUnit = $pp - $item->rate;
+            $sales[] = [
+                'sale_id'        => $item->sale->id,
+                'memo_no'        => $item->sale->memo_no,
+                'date'           => \Carbon\Carbon::parse($item->sale->date)->format('d M Y'),
+                'product'        => $item->product->name ?? '—',
+                'qty'            => $item->qty,
+                'purchase_price' => round($pp),
+                'sale_price'     => round($item->rate),
+                'loss_per_unit'  => round($lossPerUnit),
+                'total_loss'     => round($lossPerUnit * $item->qty),
+            ];
+        }
+
+        $result[] = [
+            'customer'   => $customer->name ?? 'Walk-in Customer',
+            'total_loss' => round($totalLoss),
+            'sales'      => $sales,
+        ];
+    }
+
+    return response()->json(['items' => $result]);
+}
 }

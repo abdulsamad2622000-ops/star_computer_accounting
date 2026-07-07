@@ -25,6 +25,8 @@ require __DIR__.'/auth.php';
 Route::middleware('auth')->group(function () {
 
     // Dashboard
+    // Dashboard Loss Data API
+Route::get('/dashboard/loss-data', [DashboardController::class, 'lossData'])->name('dashboard.loss.data');
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Profile
