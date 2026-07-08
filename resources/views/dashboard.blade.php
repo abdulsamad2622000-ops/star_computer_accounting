@@ -412,7 +412,6 @@ function loadSalesData(filter) {
     });
 }
 function loadLossData(filter) {
-    // Button active states
     ['this_month','last_month','all'].forEach(f => {
         const btn = document.getElementById('btn_' + f);
         if(btn) {
@@ -448,7 +447,16 @@ function loadLossData(filter) {
             return;
         }
 
-        let html = '';
+        // Grand Total
+        let grandTotal = 0;
+        data.items.forEach(g => grandTotal += g.total_loss);
+
+        let html = `
+            <div style="padding:10px 16px;background:#fff7f7;border-bottom:1px solid #fecaca;display:flex;gap:20px;flex-wrap:wrap;font-size:12px">
+                <div><span style="color:#6b7280">Total Customers:</span> <strong>${data.items.length}</strong></div>
+                <div><span style="color:#6b7280">Total Loss:</span> <strong style="color:#ef4444">Rs. ${grandTotal.toLocaleString()}</strong></div>
+            </div>`;
+
         data.items.forEach(group => {
             html += `
                 <div style="padding:10px 16px;background:#fff7f7;border-bottom:2px solid #fecaca;display:flex;justify-content:space-between;align-items:center">
