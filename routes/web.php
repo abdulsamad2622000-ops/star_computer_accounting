@@ -27,7 +27,8 @@ Route::middleware('auth')->group(function () {
     // Dashboard
     // Dashboard Loss Data API
 Route::get('/dashboard/loss-data', [DashboardController::class, 'lossData'])->name('dashboard.loss.data');
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/dashboard/sales-data', [DashboardController::class, 'salesData'])->name('dashboard.sales.data');    
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Profile
     Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');

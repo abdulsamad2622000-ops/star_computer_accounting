@@ -26,12 +26,17 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card">
-            <div class="stat-icon" style="background:#fdf4ff"><i class="bi bi-cash-stack" style="color:#a855f7"></i></div>
-            <div class="stat-value">Rs. {{ number_format($todayTotal) }}</div>
-            <div class="stat-label">Today's Sale</div>
+    <div class="stat-card" style="cursor:pointer;background:#f0fdf4;border:1px solid #bbf7d0" onclick="openSalesModal('this_month')">
+        <div class="stat-icon" style="background:#dcfce7"><i class="bi bi-graph-up-arrow" style="color:#16a34a"></i></div>
+        <div class="stat-value" style="color:#16a34a">Rs. {{ number_format($monthTotal) }}</div>
+        <div class="stat-label" style="color:#16a34a">
+            📊 This Month Sales
+            <span style="font-size:10px;display:block;margin-top:2px">
+                {{ $monthInvoices }} invoices | {{ now()->format('F Y') }} <i class="bi bi-eye ms-1"></i>
+            </span>
         </div>
     </div>
+</div>
 </div>
 
 <div class="card mb-4" style="border:2px solid #163a6f;border-radius:10px;padding:16px;background:#e7f1ff">
@@ -225,6 +230,50 @@
     </div>
 </div>
 
+
+
+
+{{-- SALES MODAL --}}
+<div class="modal fade" id="salesModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content" style="border-radius:12px;border:none;box-shadow:0 8px 32px rgba(0,0,0,0.15)">
+            <div class="modal-header" style="background:#f0fdf4;border-radius:12px 12px 0 0;border-bottom:1px solid #bbf7d0">
+                <h6 class="modal-title fw-bold" style="color:#16a34a">📊 Sales Report — Customer Wise</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div style="padding:10px 16px;background:#f0fff4;border-bottom:1px solid #bbf7d0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <small style="color:#166534;font-weight:600">Filter:</small>
+                <button onclick="loadSalesData('this_month')" id="sbtn_this_month"
+                        class="btn btn-sm" style="font-size:11px;background:#16a34a;color:#fff;border-radius:20px">
+                    📅 This Month
+                </button>
+                <button onclick="loadSalesData('last_month')" id="sbtn_last_month"
+                        class="btn btn-sm btn-outline-success" style="font-size:11px;border-radius:20px">
+                    📅 Last Month
+                </button>
+                <button onclick="loadSalesData('all')" id="sbtn_all"
+                        class="btn btn-sm btn-outline-secondary" style="font-size:11px;border-radius:20px">
+                    📅 All Time
+                </button>
+                <input type="date" id="sales_from" class="form-control form-control-sm" style="width:130px;font-size:11px">
+                <span style="font-size:11px;color:#166534">to</span>
+                <input type="date" id="sales_to" class="form-control form-control-sm" style="width:130px;font-size:11px">
+                <button onclick="loadSalesData('custom')" class="btn btn-sm btn-outline-success" style="font-size:11px;border-radius:20px">Go</button>
+            </div>
+            <div id="salesSummaryBar" style="padding:10px 16px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:none">
+            </div>
+            <div class="modal-body p-0" id="salesModalBody">
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-hourglass-split" style="font-size:24px"></i><br>
+                    <span style="font-size:13px">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
 {{-- LOSS MODAL --}}
 <div class="modal fade" id="lossModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
@@ -273,7 +322,95 @@ function openLossModal(filter) {
     new bootstrap.Modal(document.getElementById('lossModal')).show();
     loadLossData(filter || 'this_month');
 }
+function openSalesModal(filter) {
+    new bootstrap.Modal(document.getElementById('salesModal')).show();
+    loadSalesData(filter || 'this_month');
+}
 
+function loadSalesData(filter) {
+    // Button active states
+    ['this_month','last_month','all'].forEach(f => {
+        const btn = document.getElementById('sbtn_' + f);
+        if(btn) {
+            btn.style.background = f === filter ? '#16a34a' : '';
+            btn.style.color = f === filter ? '#fff' : '';
+            btn.className = f === filter
+                ? 'btn btn-sm'
+                : 'btn btn-sm btn-outline-' + (f === 'all' ? 'secondary' : 'success');
+            btn.style.borderRadius = '20px';
+            btn.style.fontSize = '11px';
+        }
+    });
+
+    const body    = document.getElementById('salesModalBody');
+    const summary = document.getElementById('salesSummaryBar');
+    body.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-success" style="width:2rem;height:2rem"></div></div>';
+    summary.style.display = 'none';
+
+    let url = '/dashboard/sales-data?filter=' + filter;
+    if(filter === 'custom') {
+        const from = document.getElementById('sales_from').value;
+        const to   = document.getElementById('sales_to').value;
+        if(!from || !to) { alert('Date range select karo!'); return; }
+        url += '&from=' + from + '&to=' + to;
+    }
+
+    fetch(url, {
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+    })
+    .then(r => r.json())
+    .then(data => {
+        // Summary bar
+        summary.innerHTML = `
+            <div style="display:flex;gap:20px;flex-wrap:wrap;font-size:12px">
+                <div><span style="color:#6b7280">Total Sales:</span> <strong style="color:#16a34a">Rs. ${data.summary.total.toLocaleString()}</strong></div>
+                <div><span style="color:#6b7280">Cash:</span> <strong style="color:#163a6f">Rs. ${data.summary.cash.toLocaleString()}</strong></div>
+                <div><span style="color:#6b7280">Online:</span> <strong style="color:#4f8ef7">Rs. ${data.summary.online.toLocaleString()}</strong></div>
+                <div><span style="color:#6b7280">Credit:</span> <strong style="color:#ef4444">Rs. ${data.summary.credit.toLocaleString()}</strong></div>
+                <div><span style="color:#6b7280">Invoices:</span> <strong>${data.summary.invoices}</strong></div>
+            </div>`;
+        summary.style.display = 'block';
+
+        if(!data.customers || data.customers.length === 0) {
+            body.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-inbox" style="font-size:24px"></i><br><span style="font-size:13px">Is period mein koi sale nahi!</span></div>';
+            return;
+        }
+
+        let html = '<table class="table table-hover mb-0" style="font-size:12px">';
+        html += `<thead style="background:#f9fafb"><tr>
+            <th class="px-3 py-2">#</th>
+            <th class="px-3 py-2">Customer</th>
+            <th class="px-3 py-2">Invoices</th>
+            <th class="px-3 py-2">Total Sale</th>
+            <th class="px-3 py-2">Cash</th>
+            <th class="px-3 py-2">Online</th>
+            <th class="px-3 py-2">Credit</th>
+            <th class="px-3 py-2">Action</th>
+        </tr></thead><tbody>`;
+
+        data.customers.forEach((c, i) => {
+            html += `<tr>
+                <td class="px-3 py-2 text-muted">${i+1}</td>
+                <td class="px-3 py-2 fw-bold">👤 ${c.name}</td>
+                <td class="px-3 py-2">${c.invoices}</td>
+                <td class="px-3 py-2 fw-bold" style="color:#16a34a">Rs. ${c.total.toLocaleString()}</td>
+                <td class="px-3 py-2" style="color:#163a6f">Rs. ${c.cash.toLocaleString()}</td>
+                <td class="px-3 py-2" style="color:#4f8ef7">Rs. ${c.online.toLocaleString()}</td>
+                <td class="px-3 py-2" style="color:#ef4444">Rs. ${c.credit.toLocaleString()}</td>
+                <td class="px-3 py-2">
+                    ${c.cust_id ? `<a href="/customers/${c.cust_id}" class="btn btn-sm btn-outline-success" style="font-size:11px;border-radius:6px">Ledger →</a>` : '—'}
+                </td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        body.innerHTML = html;
+    })
+    .catch(() => {
+        body.innerHTML = '<div class="text-center py-5 text-muted">Error loading data</div>';
+    });
+}
 function loadLossData(filter) {
     // Button active states
     ['this_month','last_month','all'].forEach(f => {

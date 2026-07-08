@@ -77,13 +77,26 @@ class DashboardController extends Controller
             }
         }
 
+        // ── Current Month Sales Summary ──────────────────────
+        $monthSales = Sale::where('type', 'sale')
+            ->whereMonth('date', now()->month)
+            ->whereYear('date', now()->year)
+            ->get();
+
+        $monthTotal    = $monthSales->sum('total');
+        $monthCash     = $monthSales->where('payment_type', 'cash')->sum('paid');
+        $monthOnline   = $monthSales->where('payment_type', 'bank_transfer')->sum('paid');
+        $monthCredit   = $monthSales->sum('balance');
+        $monthInvoices = $monthSales->count();
+
         return view('dashboard', compact(
             'totalReceivable', 'totalPayable', 'totalCustomers',
             'totalProducts', 'totalStockValue', 'lowStockCount',
             'todayTotal', 'todayInvoices', 'todayReceived',
             'todayCredit', 'todayCash',
             'totalCash', 'totalOnline', 'businessBalance',
-            'totalLoss'
+            'totalLoss',
+            'monthTotal', 'monthCash', 'monthOnline', 'monthCredit', 'monthInvoices'
         ));
     }
 
@@ -124,8 +137,8 @@ class DashboardController extends Controller
 
         $result = [];
         foreach ($items as $customerId => $groupItems) {
-            $customer   = $groupItems->first()->sale->customer;
-            $totalLoss  = $groupItems->sum(function($item) {
+            $customer  = $groupItems->first()->sale->customer;
+            $totalLoss = $groupItems->sum(function($item) {
                 $pp = $item->purchase_price ?? $item->product->purchase_price ?? 0;
                 return ($pp - $item->rate) * $item->qty;
             });
@@ -155,5 +168,68 @@ class DashboardController extends Controller
         }
 
         return response()->json(['items' => $result]);
+    }
+
+    public function salesData(Request $request)
+    {
+        $filter = $request->get('filter', 'this_month');
+
+        $query = Sale::where('type', 'sale')->with('customer');
+
+        if ($filter === 'this_month') {
+            $query->whereMonth('date', now()->month)
+                  ->whereYear('date', now()->year);
+        } elseif ($filter === 'last_month') {
+            $query->whereMonth('date', now()->subMonth()->month)
+                  ->whereYear('date', now()->subMonth()->year);
+        } elseif ($filter === 'custom') {
+            $from = $request->get('from');
+            $to   = $request->get('to');
+            if ($from && $to) {
+                $query->whereBetween('date', [$from, $to]);
+            }
+        }
+
+        $sales = $query->get();
+
+        $summary = [
+            'total'    => round($sales->sum('total')),
+            'cash'     => round($sales->where('payment_type', 'cash')->sum('paid')),
+            'online'   => round($sales->where('payment_type', 'bank_transfer')->sum('paid')),
+            'credit'   => round($sales->sum('balance')),
+            'invoices' => $sales->count(),
+        ];
+
+        $grouped = $sales->groupBy(fn($s) => $s->customer_id ?? 'walkin');
+
+        $customers = [];
+        foreach ($grouped as $customerId => $customerSales) {
+            $customer = $customerSales->first()->customer;
+            $customers[] = [
+                'name'     => $customer->name ?? 'Walk-in Customer',
+                'cust_id'  => $customerId !== 'walkin' ? $customerId : null,
+                'total'    => round($customerSales->sum('total')),
+                'cash'     => round($customerSales->where('payment_type', 'cash')->sum('paid')),
+                'online'   => round($customerSales->where('payment_type', 'bank_transfer')->sum('paid')),
+                'credit'   => round($customerSales->sum('balance')),
+                'invoices' => $customerSales->count(),
+                'sales'    => $customerSales->map(fn($s) => [
+                    'sale_id'  => $s->id,
+                    'memo_no'  => $s->memo_no,
+                    'date'     => \Carbon\Carbon::parse($s->date)->format('d M Y'),
+                    'total'    => round($s->total),
+                    'cash'     => round($s->paid),
+                    'credit'   => round($s->balance),
+                    'type'     => $s->payment_type,
+                ])->values()->toArray(),
+            ];
+        }
+
+        usort($customers, fn($a, $b) => $b['total'] - $a['total']);
+
+        return response()->json([
+            'summary'   => $summary,
+            'customers' => $customers,
+        ]);
     }
 }
