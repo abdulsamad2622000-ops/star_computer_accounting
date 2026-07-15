@@ -464,54 +464,7 @@
 
 
 
-{{-- Deleted Products (Restore Section) --}}
-@if($deletedProducts->count() > 0)
-<div class="table-card mt-4">
-    <div class="table-card-header">
-        <span class="table-card-title" style="color:#ef4444">
-            <i class="bi bi-trash me-2"></i>Deleted Products (Restore Karo)
-        </span>
-        <small class="text-muted">{{ $deletedProducts->count() }} deleted products</small>
-    </div>
-    <div class="table-responsive">
-        <table class="table mb-0" style="font-size:13px">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Product</th>
-                    <th>Stock Code</th>
-                    <th>Vendor</th>
-                    <th>Stock</th>
-                    <th>Deleted At</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-              @foreach($deletedProducts as $product)
-<tr style="opacity:0.7;background:#fff5f5">
-    <td>{{ $loop->iteration }}</td>
-                    <td><strong>{{ $product->name }}</strong></td>
-                    <td>{{ $product->stock_code ?? '—' }}</td>
-                    <td>{{ $product->vendor->name ?? '—' }}</td>
-                    <td>{{ $product->remaining_qty }}</td>
-                    <td>{{ $product->deleted_at->format('d M Y') }}</td>
-                    <td>
-                       <form action="{{ route('products.restore', $product->id) }}"
-                              method="POST" class="d-inline"
-                              onsubmit="return confirm('Restore karna chahte ho?')">
-                            @csrf
-                            <button class="btn btn-sm btn-success">
-                                <i class="bi bi-arrow-counterclockwise"></i> Restore
-                            </button>
-                        </form>
-                    </td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-</div>
-@endif
+
 
 @endsection
 
