@@ -487,9 +487,9 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach($deletedProducts as $i => $product)
-                <tr style="opacity:0.7;background:#fff5f5">
-                    <td>{{ $i + 1 }}</td>
+              @foreach($deletedProducts as $product)
+<tr style="opacity:0.7;background:#fff5f5">
+    <td>{{ $loop->iteration }}</td>
                     <td><strong>{{ $product->name }}</strong></td>
                     <td>{{ $product->stock_code ?? '—' }}</td>
                     <td>{{ $product->vendor->name ?? '—' }}</td>
