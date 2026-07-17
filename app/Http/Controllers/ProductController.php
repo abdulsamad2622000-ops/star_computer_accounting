@@ -60,8 +60,7 @@ class ProductController extends Controller
     public function update(Request $request, Product $product)
     {
         $request->validate([
-            'name'          => 'required|string|unique:products,name,' . $product->id,
-            'received_qty'  => 'nullable|integer|min:0',
+'name' => 'required|string|unique:products,name,' . $product->id . ',id,deleted_at,NULL',            'received_qty'  => 'nullable|integer|min:0',
             'remaining_qty' => 'nullable|integer|min:0',
         ]);
 
